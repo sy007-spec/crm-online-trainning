@@ -1,0 +1,25 @@
+services:
+  training:
+    image: crm-online-training:${RELEASE_TAG:-local}
+    build: .
+    init: true
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      HOST: 127.0.0.1
+      PUBLIC_URL: ${PUBLIC_URL:?Set PUBLIC_URL}
+      TRUST_PROXY: loopback
+      RUNTIME_DIR: /data
+    volumes:
+      - ${TRAINING_DATA_DIR:?Set TRAINING_DATA_DIR}:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

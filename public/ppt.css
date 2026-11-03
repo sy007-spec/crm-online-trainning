@@ -1,0 +1,23 @@
+body{margin:0}#pptRoot{min-height:100dvh;display:flex;flex-direction:column}.ppt-top,.ppt-navigation,.ppt-footer{display:flex;align-items:center;gap:12px;padding:10px 20px;background:white;border-bottom:1px solid var(--line);flex-wrap:wrap}.ppt-top{justify-content:space-between}.ppt-navigation select{flex:1;max-width:70vw}.ppt-navigation label{margin:0;flex-direction:row;align-items:center}.ppt-canvas{flex:1;padding:24px;overflow:auto}.ppt-slide{max-width:1200px;margin:auto;min-height:60vh;background:white;padding:40px;border-radius:12px;box-shadow:var(--shadow);font-size:var(--ppt-font,20px);line-height:1.7}.ppt-slide h1{font-size:1.6em}.ppt-slide .markdown h2{font-size:1.35em}.ppt-slide .markdown h3{font-size:1.2em}.ppt-slide .markdown table{font-size:.8em}.ppt-footer{justify-content:center;gap:28px;border-top:1px solid var(--line);border-bottom:0}.ppt-status{max-width:680px;margin:8vh auto;padding:24px}.ppt-qr{display:block;max-width:100%;width:280px;margin:16px auto}#shareUrl{width:100%;margin:12px 0}.ppt-honeypot{position:absolute;left:-10000px;height:0;overflow:hidden}#pptError{margin:0 20px}#pptDialogBody .card{padding:12px}@media(max-width:820px){.ppt-top,.ppt-navigation,.ppt-footer{padding:8px 12px;gap:8px}.ppt-navigation select{max-width:100%;width:100%;flex-basis:100%}.ppt-navigation input{max-width:160px}.ppt-canvas{padding:8px}.ppt-slide{padding:20px 16px;font-size:calc(var(--ppt-font,20px)*.9)}.ppt-top button,.ppt-footer button{min-height:44px}.ppt-footer{padding-bottom:calc(8px + env(safe-area-inset-bottom))}}
+
+/* Keep paging available while long slides scroll. Reserve side gutters for controls. */
+.ppt-canvas{padding-left:64px;padding-right:64px}
+.ppt-footer #prevSlide,.ppt-footer #nextSlide{position:fixed;top:50dvh;transform:translateY(-50%);z-index:15;width:44px;height:56px;padding:10px;border-radius:12px;background:var(--paper);color:var(--blue);box-shadow:0 3px 16px #182b4320;touch-action:manipulation}
+.ppt-footer #prevSlide{left:max(8px,env(safe-area-inset-left))}
+.ppt-footer #nextSlide{right:max(8px,env(safe-area-inset-right))}
+.ppt-footer button svg{display:block;width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ppt-footer button:disabled{opacity:.4}
+@media(max-width:820px){.ppt-canvas{padding-left:max(42px,calc(env(safe-area-inset-left) + 40px));padding-right:max(42px,calc(env(safe-area-inset-right) + 40px))}.ppt-slide{padding:18px 12px}.ppt-footer #prevSlide,.ppt-footer #nextSlide{width:36px;height:48px;padding:6px;border-radius:9px}.ppt-footer #prevSlide{left:max(2px,env(safe-area-inset-left))}.ppt-footer #nextSlide{right:max(2px,env(safe-area-inset-right))}}
+
+/* One compact toolbar, including slide selection. Small screens scroll horizontally. */
+.ppt-top{flex-wrap:nowrap;justify-content:flex-start;gap:12px;overflow-x:auto;padding:8px 12px}
+.ppt-top>div:first-child{order:0;flex:0 1 220px;min-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ppt-top>.ppt-navigation{order:1;flex:1 0 320px;min-width:0;flex-wrap:nowrap;padding:0;border:0;gap:10px}
+.ppt-top>.actions{order:2;flex:0 0 auto;flex-wrap:nowrap;white-space:nowrap}
+.ppt-top .ppt-navigation select{width:0;min-width:160px;max-width:none;flex:1 1 auto;height:38px;padding:6px 8px}
+.ppt-top .ppt-navigation label{flex:0 0 auto;white-space:nowrap;font-size:12px}
+.ppt-top .ppt-navigation input{width:80px;max-width:80px}
+.ppt-top button{min-height:38px}
+@media(max-width:820px){.ppt-top{gap:8px;padding:6px 8px}.ppt-top>div:first-child{flex:0 0 110px}.ppt-top>.ppt-navigation{flex:0 0 280px}.ppt-top .ppt-navigation select{flex-basis:auto}.ppt-top button,.ppt-top .ppt-navigation select{min-height:44px}}
+
+.hosting-notice{margin:12px 64px 0;padding:16px 20px;border:1px solid #d4e2f9;border-radius:14px;display:flex;align-items:center;justify-content:space-between;gap:16px;background:linear-gradient(120deg,#edf4ff,#f4f2ff);color:#264a7a}.hosting-notice.expired{background:linear-gradient(120deg,#fff5e8,#f5f4ff);border-color:#ecdcc6}.hosting-notice p{font-size:12px;margin:4px 0 0;max-width:850px}.hosting-notice a{flex:none;text-decoration:none;background:#275ec0;color:white;border-radius:8px;padding:10px 14px;font-size:13px}@media(max-width:820px){.hosting-notice{margin:8px 12px 0;padding:14px;flex-wrap:wrap}.hosting-notice a{width:100%;text-align:center}}

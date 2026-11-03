@@ -1,0 +1,8 @@
+export function source(language='both'){
+ const make=lang=>['# '+(lang==='zh'?'测试教材':'Test material'),...['A','B','C'].map((prefix,i)=>'## '+(lang==='zh'?'第'+['一','二','三'][i]+'讲：标题':'Lesson '+(i+1)+': Title')+'\n\n'+(lang==='zh'?'目标和边界':'Objectives and boundaries')+'\n\n| ID | Function | Explanation | Verification |\n|---|---|---|---|\n'+Array.from({length:[13,15,12][i]},(_,j)=>'| '+prefix+String(j+1).padStart(2,'0')+' | '+(lang==='zh'?'功能':'Function')+' '+j+' | '+(lang==='zh'?'业务规则':'Business rule')+' | '+(lang==='zh'?'核验条件':'Acceptance condition')+' |').join('\n')+'\n\n'+(lang==='zh'?'讲解与案例':'Teaching examples'))].join('\n\n');return make('zh')+(language==='both'?'\n\n<!-- training:en -->\n\n'+make('en'):'');
+}
+
+// Synthetic UI/security fixture; deliberately contains no product teaching rules.
+export function testMaterial(){const pair=text=>({zh:'测试 '+text,en:text});return {lessons:['manager','investor','operations'].map((id,i)=>({id,title:pair(id),pages:Array.from({length:[9,10,9][i]},(_,n)=>{const page=id+'-'+String(n+1).padStart(2,'0');return {id:page,title:pair('Test page '+page),body:pair('Synthetic fixture content. '.repeat(12)),speaker:pair('Synthetic instructor content. '.repeat(4)),objective:pair('Verify the test scenario'),exercise:{question:pair('What does the test verify?'),answer:pair('The expected test outcome.')}}})}))}}
+
+export function versionedSource(){return source().replace(/^(\| A01 \|.*)$/gm,line=>':::v1\n'+line.replace('业务规则','批准即入账').replace('Business rule','Book on approval')+'\n:::\n:::v2 变化\n'+line.replace('业务规则','待投入后新成交生效').replace('Business rule','Wait for a new execution')+'\n:::')}
