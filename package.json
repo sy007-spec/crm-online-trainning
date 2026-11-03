@@ -13,7 +13,9 @@
   },
   "dependencies": {
     "geoip-country": "5.0.202610310241",
+    "mammoth": "1.13.0",
     "mermaid": "12.2.0",
+    "pdfjs-dist": "6.5.438",
     "qrcode": "1.5.4",
     "sharp": "^0.35.5"
   },
