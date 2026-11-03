@@ -1,0 +1,10 @@
+/* Shared language control: always in the upper-right of the page header. */
+header:has(>.language-switch){position:relative;padding-right:148px;min-height:76px}
+header>.language-switch{position:absolute;top:22px;right:24px}
+.language-switch{display:inline-flex!important;align-items:center;justify-content:center;gap:8px;width:auto!important;min-height:38px;margin:0!important;padding:8px 12px!important;border:1px solid #d8e5df!important;border-radius:9px!important;background:#fff!important;color:#245f51!important;font:500 13px/1.4 Inter,"Segoe UI","Microsoft YaHei",sans-serif!important;white-space:nowrap;cursor:pointer}
+.language-switch svg{width:18px;height:18px;flex:none}.language-switch:focus-visible{outline:3px solid #bb8e42;outline-offset:3px}
+@media(max-width:600px){header:has(>.language-switch){padding-right:130px}header>.language-switch{right:16px;top:18px}}
+
+#app>.top:has(>.language-switch){padding-right:148px;min-height:76px}@media(max-width:820px){#app>.top:has(>.language-switch){padding-right:16px;min-height:76px}#app>.top:has(>.language-switch)>div:first-child{padding-right:120px;min-height:42px;width:100%}}
+
+.classroom-invitation{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border:1px solid #d8e5df;border-radius:9px;background:white;color:#245f51;text-decoration:none}.classroom-invitation svg{width:22px;height:22px}.classroom-invitation:focus-visible{outline:3px solid #bb8e42;outline-offset:3px}header>.classroom-invitation{position:absolute;right:132px;top:22px}header:has(>.classroom-invitation),#app>.top:has(>.classroom-invitation){padding-right:190px}@media(max-width:820px){#app>.top:has(>.classroom-invitation){padding-right:16px}#app>.top:has(>.classroom-invitation)>div:first-child{padding-right:170px}}@media(max-width:600px){header>.classroom-invitation{right:124px;top:18px}header:has(>.classroom-invitation){padding-right:180px}}

@@ -450,3 +450,10 @@ test('version managers are course scoped, revocable and retain instructor identi
  await admin.request('/api/admin/instructor-grants','PUT',{instructor:staff.id,course:'pamm',capabilities:{draft:true},hours:24});assert.equal((await teacher.request('/api/admin/revisions?course=pamm')).status,403);
  }finally{await f.cleanup()}
 });
+
+test('classroom invitations use only the current verified identity without exposing hosting details',async()=>{
+ const seen=[],f=await fixture({hosting:{allowLegacyAdmin:true,status:()=>({active:true,limits:{courses:null,images:100,aiTokens:40000000}}),classroomInvitation:address=>{seen.push(address);return {url:address==='owner@example.test'?null:'https://hosting.test/?ref=public'}}}});try{
+  const learner=f.client();await learner.session();assert.equal((await learner.request('/api/classroom-invitation?email=owner@example.test')).data.url,'https://hosting.test/?ref=public');assert.equal(seen.at(-1),null);
+  await learner.request('/api/access','POST',{code:'pamm',contact:'owner@example.test',name:'Owner',consent:true});const state=(await learner.session()).data;assert.equal(state.classroomInvitation.url,null);assert.equal(state.hosting,undefined);assert.equal((await learner.request('/api/classroom-invitation')).data.url,null);
+ }finally{await f.cleanup()}
+});
