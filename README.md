@@ -1,4 +1,6 @@
-# Online Training
+# TeachInPublic
+
+Build your teaching in public, with learner access under your control.
 
 MIT-licensed, self-hosted software for bilingual teaching, course access approval, discussions, notes and time-limited reading links. Optional [managed hosting](https://training.seii.top/) is a separate service; self-hosted installations have no hosting subscription requirement. Dependencies retain their own licenses.
 

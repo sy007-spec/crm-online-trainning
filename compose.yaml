@@ -1,6 +1,6 @@
 services:
   training:
-    image: crm-online-training:${RELEASE_TAG:-local}
+    image: teach-in-public:${RELEASE_TAG:-local}
     build: .
     init: true
     restart: unless-stopped
