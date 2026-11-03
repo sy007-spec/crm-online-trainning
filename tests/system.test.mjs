@@ -430,3 +430,23 @@ test('hosting operations are owner-only; learner capabilities disclose no subscr
  await admin.request('/api/admin/whitelist','POST',{course:'pamm',cidr:'127.0.0.1'});await learner.select();assert.equal((await learner.session()).data.hosting,undefined);assert.equal((await learner.request('/api/hosting')).status,403);assert.deepEqual((await learner.request('/api/images/capability')).data,{allowed:true});images=0;assert.deepEqual((await learner.request('/api/images/capability')).data,{allowed:false,reason:'image_upload_unsupported'});images=null;assert.deepEqual((await learner.request('/api/images/capability')).data,{allowed:true});images=1;f.store.run('INSERT INTO space_usage VALUES(?,?,?)',new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit'}).format(new Date(f.store.now())).replace('/','-'),'images',1);assert.deepEqual((await learner.request('/api/images/capability')).data,{allowed:false,reason:'image_quota_exhausted'});active=false;assert.equal((await learner.request('/api/images/capability')).data.reason,'image_upload_unsupported');assert.equal((await learner.request('/api/course')).status,200);
  }finally{await f.cleanup()}
 });
+
+test('version managers are course scoped, revocable and retain instructor identity',async()=>{
+ const f=await fixture();try{const admin=f.client(),teacher=f.client();await admin.login();const staff=(await admin.request('/api/admin/instructors','POST',{email:'version-teacher@example.test',name:'Version manager'})).data;
+ await admin.request('/api/admin/instructor-grants','PUT',{instructor:staff.id,course:'pamm',capabilities:{draft:true},hours:24});await teacher.session();await teacher.request('/api/access','POST',{code:'pamm',contact:'version-teacher@example.test',name:'Teacher',consent:true});
+ assert.equal((await teacher.request('/api/admin/revisions?course=pamm')).status,403);
+ await admin.request('/api/admin/instructor-grants','PUT',{instructor:staff.id,course:'pamm',capabilities:{versions:true},hours:24});
+ assert.equal((await teacher.request('/api/admin/revisions?course=pamm')).status,200);
+ assert.equal((await teacher.request('/api/admin/material?course=pamm')).status,200);
+ assert.equal((await teacher.request('/api/admin/revisions?course=other')).status,403);
+ assert.equal((await teacher.request('/api/admin/courses')).status,403);
+ assert.equal((await teacher.request('/api/admin/inherited-access?course=pamm')).status,403);
+ assert.equal((await teacher.request('/api/admin/publication-scope','PUT',{course:'pamm',inheritAccessFrom:'other'})).status,403);
+ assert.equal((await teacher.request('/api/admin/default-business','PUT',{course:'pamm',businessVersion:'v1'})).status,200);
+ assert.equal(f.store.get("SELECT actor FROM audit WHERE action='business-version.default' ORDER BY rowid DESC LIMIT 1").actor,'instructor:'+staff.id);
+ assert.equal((await teacher.session()).data.admin,false);
+ assert.equal((await teacher.request('/api/admin/material','PUT',{course:'pamm',baseVersion:1,material:testMaterial()})).status,403);
+ assert.equal((await teacher.request('/api/admin/revisions?course=pamm','GET',undefined,{'x-learning-view':'learner'})).status,403);
+ await admin.request('/api/admin/instructor-grants','PUT',{instructor:staff.id,course:'pamm',capabilities:{draft:true},hours:24});assert.equal((await teacher.request('/api/admin/revisions?course=pamm')).status,403);
+ }finally{await f.cleanup()}
+});
