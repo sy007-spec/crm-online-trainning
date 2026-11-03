@@ -1,7 +1,8 @@
+import {checkMarkdown} from './upload-policy.mjs';
 import {fail,validateMaterial} from './security.mjs';
 import {parseTrainingDocument,serializeTrainingDocument,markdownHash,combineTrainingLanguages,splitTrainingLanguages} from './markdown-import.mjs';
 
-export function materialRevisions(store,business){
+export function materialRevisions(store,business,hosting){
  store.db.exec(`CREATE TABLE IF NOT EXISTS material_revision_state(course_id TEXT,revision INTEGER,ever_published INTEGER NOT NULL DEFAULT 0,deleted INTEGER NOT NULL DEFAULT 0,updated TEXT,PRIMARY KEY(course_id,revision));`);
  store.run('INSERT OR IGNORE INTO material_revision_state SELECT course_id,version,0,0,created FROM versions');
  store.run('UPDATE material_revision_state SET ever_published=1 WHERE EXISTS (SELECT 1 FROM publications p WHERE p.course_id=material_revision_state.course_id AND p.version=revision) OR EXISTS (SELECT 1 FROM business_publications p WHERE p.course_id=material_revision_state.course_id AND p.revision=material_revision_state.revision)');
@@ -14,6 +15,7 @@ export function materialRevisions(store,business){
  function source(c,r,s,language){const result=combinedSource(c,r,s);if(!language)return result;if(!['zh','en'].includes(language))fail(400,'Unsupported source language');const part=splitTrainingLanguages(result.markdown).find(f=>f.language===language);return {...result,markdown:part.markdown,language,filename:c.id+'-R'+Number(r)+'.'+language+'.md',sha256:markdownHash(part.markdown),revisionSha256:result.sha256}}
 
  function upload(c,body,s,actor){
+  checkMarkdown(body,hosting);
   if(body.baseVersion!==c.draft)fail(409,'Material changed; reload before saving');
   const replacing=body.replaceLatest===true,revision=replacing?c.draft:c.draft+1;
   if(replacing){const old=state(c,revision);if(!revision||old?.ever_published||old?.deleted||store.get('SELECT revision FROM business_publications WHERE course_id=? AND revision=?',c.id,revision))fail(409,'Only the latest never-published draft can be replaced');const original=source(c,revision,s);if(body.baseSha256!==original.sha256)fail(409,'Draft changed; reload before replacing')}

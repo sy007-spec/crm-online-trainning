@@ -20,7 +20,7 @@ function parseLanguage(text,lang){
  });
 }
 export function parseTrainingMarkdown(raw,{previous=null,filename='training.md'}={}){
- if(typeof raw!=='string'||Buffer.byteLength(raw)>1000000||raw.includes('\0'))fail(400,'Upload a UTF-8 Markdown file smaller than 1 MB');
+ if(typeof raw!=='string'||Buffer.byteLength(raw)>22000000||raw.includes('\0'))fail(400,'Upload a UTF-8 Markdown file no larger than 22 MB');
  const text=raw.replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n').trim();if(/^<!--\s*training:pages\s*-->\s*$/m.test(text))return parsePageSnapshot(text,{previous,filename});const halves=text.split(/^<!--\s*training:en\s*-->\s*$/m);if(halves.length>2)fail(400,'Only one English language marker is allowed');
  const zh=parseLanguage(halves[0],'zh'),en=halves[1]?.trim()?parseLanguage(halves[1],'en'):null;const warnings=[];if(!en)warnings.push('English translation is missing. Add <!-- training:en --> followed by the English version before publishing.');
  const translationChecks={};const old=new Map(previous?.lessons?.flatMap(l=>l.pages).map(p=>[p.id,p])||[]);
@@ -51,7 +51,7 @@ export function projectBusinessMarkdown(raw){
 
 // One document revision can contain independently governed business versions.
 export function parseTrainingDocument(raw,{previousByBusiness={},filename='training.md'}={}){
- if(typeof raw!=='string'||Buffer.byteLength(raw)>1000000)fail(400,'Upload a UTF-8 Markdown file smaller than 1 MB');
+ if(typeof raw!=='string'||Buffer.byteLength(raw)>22000000)fail(400,'Upload a UTF-8 Markdown file no larger than 22 MB');
  const text=raw.replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n').trim();const markers=[...text.matchAll(/^#\s+(?:业务版本|Business version)\s+([a-z][a-z0-9_-]{0,31})(?:\s*[:：].*)?\s*$/gm)];
  if(!markers.length){const branches=projectBusinessMarkdown(text);const versions=branches.map(({id,text:section})=>{const parsed=parseTrainingMarkdown(section,{previous:previousByBusiness[id],filename});parsed.material.source.sha256=markdownHash(text);parsed.material.source.businessVersion=id;return {id,...parsed}});return {material:versions[0].material,markdown:text,businessVersions:versions.map(v=>({id:v.id,material:v.material})),summary:{lessons:versions.reduce((n,v)=>n+v.summary.lessons,0),pages:versions.reduce((n,v)=>n+v.summary.pages,0),features:versions.reduce((n,v)=>n+v.summary.features,0),sha256:markdownHash(text),warnings:versions.flatMap(v=>v.summary.warnings.map(w=>v.id+': '+w)),businessVersions:versions.map(v=>({id:v.id,pages:v.summary.pages,features:v.summary.features,warnings:v.summary.warnings}))}}}
  if(markers.length>12)fail(400,'Maximum 12 business versions per upload');if(text.slice(0,markers[0].index).trim())fail(400,'Put each business version under its heading, starting on the first line');
@@ -88,7 +88,7 @@ export function splitTrainingLanguages(raw){
 export function combineTrainingLanguages(files){
  if(!Array.isArray(files)||files.length!==2)fail(400,'Select both Chinese and English Markdown files');
  const languages=new Map();let total=0;
- for(const file of files){if(typeof file?.markdown!=='string'||file.markdown.includes('\0'))fail(400,'Invalid Markdown language file');total+=Buffer.byteLength(file.markdown);if(total>1000000)fail(400,'Combined Markdown must be smaller than 1 MB');
+ for(const file of files){if(typeof file?.markdown!=='string'||file.markdown.includes('\0'))fail(400,'Invalid Markdown language file');total+=Buffer.byteLength(file.markdown);if(total>22000000)fail(400,'Combined Markdown must be no larger than 22 MB');
  const text=file.markdown.replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n').trim(),marker=text.match(/^<!--\s*training:language (zh|en)\s*-->\n/);if(!marker)fail(400,'Each file needs a training:language zh or en marker');const language=marker[1];if(languages.has(language))fail(400,'Select one Chinese and one English file');const raw=text.slice(marker[0].length).trim();if(/<!--\s*training:(?:en|language)\b/.test(raw))fail(400,'Language files must not contain mixed language sections');languages.set(language,documentSections(raw));}
  const zh=languages.get('zh'),en=languages.get('en');if(!zh||!en||JSON.stringify(zh.map(b=>b.id).sort())!==JSON.stringify(en.map(b=>b.id).sort()))fail(400,'Chinese and English business versions must match');
  return zh.map(b=>{const e=en.find(x=>x.id===b.id);if(/training:pages/.test(b.text)!==/training:pages/.test(e.text))fail(400,'Chinese and English document formats must match');return '# 业务版本 '+b.id+'\n\n'+b.text+'\n\n<!-- training:en -->\n\n'+e.text.replace(/^<!--\s*training:pages\s*-->\s*$/m,'').trim()}).join('\n\n')+'\n';
