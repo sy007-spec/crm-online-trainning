@@ -57,10 +57,10 @@ PPT reading links created with the first-open policy start a separate duration w
 Hosted content storage is 100 MB (Basic) / 500 MB (Advanced); sources, parsed copies, revisions, images, discussions and restore archives count. Private notes and private discussions are excluded from merchant cloud backups and restore. The hosting platform alone orchestrates OAuth, schedules and administrator-only restore approval; the core exports an allowlisted teaching snapshot and applies nonpublishing, transactional imports.
 
 
-### 飞书 / Lark 账号登录与课程选择
+### 外部身份与课程选择
 
-管理员配置应用凭据、区域并启用登录，在开放平台登记本部署的 /api/lark/oauth/callback，申请 contact:user.email:readonly。课程入口、管理员和讲师登录页提供扫码入口；已登录用户也可绑定。首次关联要求飞书返回有效邮箱，已登录账户必须邮箱一致；身份键包含应用及区域，跨应用或跨课堂不共享绑定。管理员只有在已通过系统管理员验证的会话中绑定，才能保留该管理身份；普通用户扫码不会获得管理员权限。
+独立部署使用邮箱账户登录，不内置供应商扫码登录。托管服务可安装可信服务端身份适配器；配置协议见 [EXTERNAL_IDENTITY_SPEC.md](EXTERNAL_IDENTITY_SPEC.md)。供应商应用、授权回调和绑定实现由托管库维护。
 
-OAuth 验证成功可作为登录证明；课程口令、阅读同意、IP及访问审批仍独立生效。首次访客无课程时必须输入口令。再次扫码后显示当前账户的课程列表，优先选择最后学习课程，有当前访问权限时5秒后进入；取消、切换选项、关闭或切到后台会停止倒计时。无权限课程不自动进入，可按原规则申请访问。绑定浏览器/IP的许可不自动转移到新设备。学习记录按原邮箱用户保留。
+外部验证通过后，课程口令、阅读同意、IP及访问审批仍独立生效。首次访客输入课程口令；返回用户可选择已关联课程，优先最后学习课程，有权限时五秒后进入。取消、切换选项、关闭或切到后台停止倒计时。绑定浏览器/IP的许可不会转移到新设备。
 
-个人资料设置提供飞书/Lark绑定状态及扫码绑定按钮。未配置登录应用时，学习入口保留禁用的扫码按钮并解释原因；有管理权限的用户可从个人资料进入配置。绑定状态按当前应用核对，切换应用后不会错误显示旧应用已经绑定。
+个人设置按适配器描述显示身份状态与绑定操作。未安装适配器时不显示外部身份入口。原统计卡片和卡片审批继续独立配置。
