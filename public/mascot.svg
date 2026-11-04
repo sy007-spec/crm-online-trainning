@@ -1,33 +1,57 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="小圆 XiaoYuan，温暖陪伴型导师吉祥物">
-  <!-- ground shadow -->
-  <ellipse cx="60" cy="110" rx="36" ry="5" fill="#F0E4D3"/>
-  <!-- arms (behind body) -->
-  <path d="M22 66 Q12 76 18 86" stroke="#E8A23B" stroke-width="9" stroke-linecap="round" fill="none"/>
-  <path d="M98 66 Q108 76 102 86" stroke="#E8A23B" stroke-width="9" stroke-linecap="round" fill="none"/>
-  <circle cx="17.5" cy="87" r="5" fill="#E8A23B"/>
-  <circle cx="102.5" cy="87" r="5" fill="#E8A23B"/>
-  <!-- body -->
-  <circle cx="60" cy="58" r="45" fill="#F0B848"/>
-  <!-- belly -->
-  <ellipse cx="60" cy="72" rx="27" ry="23" fill="#FFF3D5"/>
-  <!-- sparkles -->
-  <path d="M28 26 l2.2 5.8 5.8 2.2 -5.8 2.2 -2.2 5.8 -2.2 -5.8 -5.8 -2.2 5.8 -2.2 Z" fill="#F7D9A8"/>
-  <path d="M96 18 l1.7 4.5 4.5 1.7 -4.5 1.7 -1.7 4.5 -1.7 -4.5 -4.5 -1.7 4.5 -1.7 Z" fill="#E98358" opacity="0.85"/>
-  <!-- eyes -->
-  <circle cx="47" cy="50" r="6.5" fill="#5A3E1B"/>
-  <circle cx="73" cy="50" r="6.5" fill="#5A3E1B"/>
-  <circle cx="49.3" cy="47.6" r="2.2" fill="#FFFDF9"/>
-  <circle cx="75.3" cy="47.6" r="2.2" fill="#FFFDF9"/>
-  <!-- blush -->
-  <ellipse cx="37" cy="62" rx="5.5" ry="3.8" fill="#E98358" opacity="0.5"/>
-  <ellipse cx="83" cy="62" rx="5.5" ry="3.8" fill="#E98358" opacity="0.5"/>
-  <!-- smile -->
-  <path d="M50 68 Q60 78 70 68" stroke="#5A3E1B" stroke-width="3.2" fill="none" stroke-linecap="round"/>
-  <!-- graduation cap -->
-  <path d="M36 33 L60 22.5 L84 33 L60 43.5 Z" fill="#8A5B22"/>
-  <path d="M60 43.5 L60 55" stroke="#8A5B22" stroke-width="3" fill="none"/>
-  <path d="M84 33 L88.5 39.5 L84 44 Z" fill="#8A5B22"/>
-  <circle cx="90" cy="41" r="4" fill="#E98358"/>
-  <!-- pointer in right hand -->
-  <rect x="86" y="70" width="26" height="3.5" rx="1.75" fill="#8A5B22" transform="rotate(24 99 72)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="小圆 XiaoYuan 温暖陪伴型导师 · 科技现代版">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="40%" r="62%">
+      <stop offset="0%" stop-color="#FFE9C4"/>
+      <stop offset="68%" stop-color="#FFF3D5" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#FFF8F0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bodyG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F4B550"/>
+      <stop offset="100%" stop-color="#E8923C"/>
+    </linearGradient>
+    <radialGradient id="coreG" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#FBD9C8"/>
+      <stop offset="100%" stop-color="#E98358"/>
+    </radialGradient>
+  </defs>
+  <!-- hexagon HUD frame + soft warm glow -->
+  <path d="M60 6 L104 33 L104 83 L60 110 L16 83 L16 33 Z" fill="url(#glow)" stroke="#F7D9A8" stroke-width="2.2" stroke-linejoin="round"/>
+  <!-- data-stream arcs + orbit nodes -->
+  <path d="M26 24 A46 44 0 0 1 60 10" stroke="#F0B848" stroke-width="1.8" fill="none" stroke-linecap="round" opacity="0.9"/>
+  <path d="M94 26 A46 44 0 0 0 66 10" stroke="#F0B848" stroke-width="1.8" fill="none" stroke-linecap="round" opacity="0.9"/>
+  <circle cx="60" cy="10" r="3.2" fill="#E98358"/>
+  <circle cx="26" cy="24" r="2.2" fill="#E8923C"/>
+  <circle cx="94" cy="26" r="2.2" fill="#E8923C"/>
+  <!-- body: geometric rounded square (squircle) -->
+  <rect x="21" y="20" width="78" height="82" rx="26" fill="url(#bodyG)"/>
+  <!-- left arm stub -->
+  <path d="M21 66 Q13 74 18 82" stroke="#E8923C" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+  <circle cx="18" cy="84" r="3" fill="#E8923C"/>
+  <!-- right arm stub -->
+  <path d="M99 64 Q107 72 103 80" stroke="#E8923C" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+  <circle cx="103" cy="82" r="3" fill="#E8923C"/>
+  <!-- pointer: sleek line with glowing tip -->
+  <line x1="102" y1="78" x2="110" y2="58" stroke="#8A5B22" stroke-width="2.6" stroke-linecap="round"/>
+  <circle cx="110" cy="58" r="3" fill="#E98358"/>
+  <!-- chest panel -->
+  <rect x="40" y="66" width="40" height="26" rx="12" fill="#FFF3D5"/>
+  <!-- glowing hexagonal core node -->
+  <polygon points="60,70 66,73 66,79 60,82 54,79 54,73" fill="url(#coreG)"/>
+  <circle cx="60" cy="76" r="1.8" fill="#FFFDF9"/>
+  <!-- data dots -->
+  <circle cx="49" cy="86" r="1.7" fill="#E8923C"/>
+  <circle cx="60" cy="87.5" r="2.1" fill="#E98358"/>
+  <circle cx="71" cy="86" r="1.7" fill="#E8923C"/>
+  <!-- anime eyes (modern, warm) -->
+  <path d="M42 38 Q45.5 34.5 49 38 Q45.5 41.5 42 38 Z" fill="#332E2A"/>
+  <path d="M71 38 Q74.5 34.5 78 38 Q74.5 41.5 71 38 Z" fill="#332E2A"/>
+  <circle cx="46" cy="36.4" r="1.4" fill="#FFFDF9"/>
+  <circle cx="75" cy="36.4" r="1.4" fill="#FFFDF9"/>
+  <!-- gentle smile -->
+  <path d="M53.5 46 Q60 51 66.5 46" stroke="#5A3E1B" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <!-- slim geometric cap -->
+  <path d="M44 20 L60 13 L76 20 L60 27 Z" fill="#8A5B22"/>
+  <path d="M60 27 L60 34" stroke="#8A5B22" stroke-width="2.4" fill="none"/>
+  <path d="M76 20 L80 25 L76 28 Z" fill="#8A5B22"/>
+  <circle cx="81.5" cy="26.5" r="2.6" fill="#E98358"/>
 </svg>
