@@ -1,3 +1,5 @@
+import './tooltips.js';
+import './theme.js';
 const valid=value=>['zh','en'].includes(value);
 export function readLanguage(fallback='en'){try{for(const key of ['ui-language','hosting-lang','training-lang']){const value=localStorage.getItem(key);if(valid(value))return value}}catch{}return valid(fallback)?fallback:'en'}
 export function saveLanguage(value){if(!valid(value))return;try{for(const key of ['ui-language','hosting-lang','training-lang'])localStorage.setItem(key,value)}catch{}}
