@@ -1,3 +1,5 @@
+if(!globalThis[Symbol.for('seii.training.theme')]){
+globalThis[Symbol.for('seii.training.theme')]=true;
 const key='seii-training-theme',root=document.documentElement,system=matchMedia('(prefers-color-scheme: dark)');
 let preference;try{preference=localStorage.getItem(key)}catch{}
 function apply(value){root.dataset.theme=value;root.style.colorScheme=value;updateButtons()}
@@ -9,3 +11,5 @@ function mount(){for(const language of document.querySelectorAll('header .langua
 new MutationObserver(mount).observe(root,{childList:true,subtree:true});
 new MutationObserver(updateButtons).observe(root,{attributes:true,attributeFilter:['lang']});
 mount();
+
+}

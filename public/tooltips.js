@@ -1,3 +1,5 @@
+if(!globalThis[Symbol.for('seii.training.tooltips')]){
+globalThis[Symbol.for('seii.training.tooltips')]=true;
 // Shared by the classroom and hosting platform; no hover timer or fade-in.
 const selector='button,a,[role="button"]';
 let active=null,bubble=null,dismissed=null;
@@ -15,3 +17,5 @@ document.addEventListener('scroll',hide,true);
 addEventListener('resize',hide);
 addEventListener('blur',hide);
 new MutationObserver(()=>{if(active&&!active.isConnected)hide();else if(active&&label(active)!==bubble?.textContent)show(active)}).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['title','aria-label','data-tooltip']});
+
+}
