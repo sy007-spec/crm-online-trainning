@@ -1,0 +1,21 @@
+import {token,digest,fail} from './security.mjs';
+import {normalizeEmail,validEmail} from './email-identity.mjs';
+export function larkLogin(store,{configuration,identities,fetcher=fetch}){
+ store.db.exec('CREATE TABLE IF NOT EXISTS lark_identities(app TEXT,open_id TEXT,user_id TEXT NOT NULL,created TEXT,PRIMARY KEY(app,open_id),UNIQUE(app,user_id))');
+ const cfg=()=>{const c=configuration();if(!c?.oauthEnabled||!c.appId||!c.appSecret)fail(503,'飞书 / Lark 登录尚未配置 / Lark sign-in is not configured');return c};
+ const appKey=c=>(c.region==='lark'?'lark':'feishu')+':'+c.appId;
+ function start(s,{verified=false,destination='/'}={}){const c=cfg(),state=token();store.run("DELETE FROM settings WHERE key LIKE 'lark-login:%' AND json_extract(value,'$.expires')<?",Date.now());store.set('lark-login:'+digest(state),{session:s.id,app:appKey(c),expires:Date.now()+600000,user:verified?s.user_id:null,admin:verified&&!!s.admin,destination:['/admin','/instructor'].includes(destination)?destination:'/'});const u=new URL((c.region==='lark'?'https://accounts.larksuite.com':'https://accounts.feishu.cn')+'/open-apis/authen/v1/authorize');u.search=new URLSearchParams({client_id:c.appId,response_type:'code',redirect_uri:c.origin+'/api/lark/oauth/callback',state,scope:'contact:user.email:readonly'}).toString();return {url:u.href}}
+ async function complete(s,state,code){const key='lark-login:'+digest(state||''),row=store.setting(key),c=cfg();if(!row||row.session!==s.id||row.expires<Date.now()||row.app!==appKey(c)||typeof code!=='string'||!code||code.length>2048)fail(401,'Invalid or expired OAuth state');store.run('DELETE FROM settings WHERE key=?',key);const base=c.region==='lark'?'https://open.larksuite.com':'https://open.feishu.cn';
+ const r=await fetcher(base+'/open-apis/authen/v2/oauth/token',{method:'POST',redirect:'error',signal:AbortSignal.timeout(15000),headers:{'content-type':'application/json'},body:JSON.stringify({client_id:c.appId,client_secret:c.appSecret,grant_type:'authorization_code',code,redirect_uri:c.origin+'/api/lark/oauth/callback'})}),t=await r.json();if(!r.ok||t.code||!t.access_token)fail(401,'Lark authorization failed');
+ const response=await fetcher(base+'/open-apis/authen/v1/user_info',{redirect:'error',signal:AbortSignal.timeout(15000),headers:{authorization:'Bearer '+t.access_token}}),data=await response.json(),profile=data.data;if(!response.ok||data.code||!/^ou_[\w-]+$/.test(profile?.open_id||''))fail(401,'Lark identity unavailable');
+ const existing=store.get('SELECT user_id FROM lark_identities WHERE app=? AND open_id=?',row.app,profile.open_id);
+ if(row.user&&row.user!==s.user_id)fail(401,'Account changed; authorize again');
+ let user=existing?.user_id;const email=normalizeEmail(profile.enterprise_email||profile.email),current=store.get('SELECT * FROM users WHERE id=?',row.user||'');
+ if(row.user&&existing&&existing.user_id!==row.user)fail(409,'Lark identity is already linked to another account');
+ if(!existing){if(!validEmail(email))fail(403,'请授权邮箱信息，或先登录邮箱账户再绑定 / Authorize your email to link an account');if(current?.contact&&normalizeEmail(current.contact)!==email)fail(403,'Lark email must match your system account');user=identities.bind(row.user||s.device_user_id||s.user_id,email,current?.name||store.get('SELECT u.name FROM email_users e JOIN users u ON u.id=e.user_id WHERE e.email=?',email)?.name||String(profile.name||email).slice(0,80));}
+ if(!store.get('SELECT id FROM sessions WHERE id=? AND expires>?',s.id,store.now()))fail(401,'Session expired');
+ store.transaction(()=>{if(!existing){if(store.get('SELECT open_id FROM lark_identities WHERE app=? AND user_id=?',row.app,user))fail(409,'This account is already linked; contact an administrator to change it');store.run('INSERT INTO lark_identities VALUES(?,?,?,?)',row.app,profile.open_id,user,store.now())}if(row.admin&&!store.get('SELECT user_id FROM user_admins WHERE user_id=?',user))store.run('INSERT INTO user_admins VALUES(?,?,?)',user,'admin:'+row.user,store.now());store.run('UPDATE users SET lark_id=?,tenant=? WHERE id=?',profile.open_id,profile.tenant_key||'',user);store.audit(user,'lark.identity-login',{linked:!existing})});
+ return {user,destination:row.destination};
+ }
+ return {start,complete,available:()=>{try{cfg();return true}catch{return false}}};
+}

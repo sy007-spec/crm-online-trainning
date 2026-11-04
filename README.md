@@ -55,3 +55,10 @@ Hosting injects a current subscription policy into the core; self-hosted install
 PPT reading links created with the first-open policy start a separate duration window on each recipient's first authorized material read, not at link creation or approval. Refreshes, status polling, denied access and analytics events do not start or reset a window. Approved recipients share the same window across approved browsers with the same email; preapproved anonymous links use browser identity. Requiring individual approval is recommended when recipient-level enforcement matters. Existing fixed-deadline links preserve their promised deadlines. Revocation and publication restrictions still apply.
 
 Hosted content storage is 100 MB (Basic) / 500 MB (Advanced); sources, parsed copies, revisions, images, discussions and restore archives count. Private notes and private discussions are excluded from merchant cloud backups and restore. The hosting platform alone orchestrates OAuth, schedules and administrator-only restore approval; the core exports an allowlisted teaching snapshot and applies nonpublishing, transactional imports.
+
+
+### 飞书 / Lark 账号登录与课程选择
+
+管理员配置应用凭据、区域并启用登录，在开放平台登记本部署的 /api/lark/oauth/callback，申请 contact:user.email:readonly。课程入口、管理员和讲师登录页提供扫码入口；已登录用户也可绑定。首次关联要求飞书返回有效邮箱，已登录账户必须邮箱一致；身份键包含应用及区域，跨应用或跨课堂不共享绑定。管理员只有在已通过系统管理员验证的会话中绑定，才能保留该管理身份；普通用户扫码不会获得管理员权限。
+
+OAuth 验证成功可作为登录证明；课程口令、阅读同意、IP及访问审批仍独立生效。首次访客无课程时必须输入口令。再次扫码后显示当前账户的课程列表，优先选择最后学习课程，有当前访问权限时5秒后进入；取消、切换选项、关闭或切到后台会停止倒计时。无权限课程不自动进入，可按原规则申请访问。绑定浏览器/IP的许可不自动转移到新设备。学习记录按原邮箱用户保留。
