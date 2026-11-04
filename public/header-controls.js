@@ -9,3 +9,36 @@ export function compactHeader(header=document.querySelector('header')){
   el.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+paths[key]+'"/></svg>';
  }
 }
+
+// Keep the account entry at the far right; the popover escapes toolbar clipping.
+export function accountMenu({user,save,header=document.querySelector('header')}){
+ const logout=header?.querySelector('#logout');if(!logout||header.querySelector('#accountMenuButton'))return;
+ const zh=document.documentElement.lang.startsWith('zh'),t=(a,b)=>zh?a:b;
+ const trigger=document.createElement('button');trigger.type='button';trigger.id='accountMenuButton';trigger.className='header-icon account-menu-trigger';trigger.setAttribute('aria-label',t('账户菜单','Account menu'));trigger.setAttribute('aria-expanded','false');trigger.setAttribute('aria-controls','accountMenu');trigger.setAttribute('aria-haspopup','true');
+ trigger.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10" cy="7" r="4"/><path d="M2 21v-3a8 8 0 0 1 16 0v3m1-12 3 3-3 3"/></svg>';
+ const menu=document.createElement('div');menu.id='accountMenu';menu.className='account-menu';menu.popover='auto';menu.setAttribute('aria-label',t('账户操作','Account actions'));
+ const name=document.createElement('strong');name.className='account-menu-name';name.textContent=user?.name||t('当前账户','Current account');menu.append(name);
+ const profile=document.createElement('button');profile.type='button';profile.id='ownProfile';profile.textContent=t('个人资料设置','Profile settings');menu.append(profile);
+ for(const e of header.querySelectorAll('#switchRoleView,a[href="/instructor"],a[href="/admin"],a[href*="/_hosting/return"]')){const label=e.getAttribute('aria-label')||e.textContent;e.classList.remove('header-icon');e.removeAttribute('title');e.removeAttribute('data-tooltip');e.textContent=label;menu.append(e)}
+ logout.classList.remove('header-icon');logout.removeAttribute('title');logout.removeAttribute('data-tooltip');logout.textContent=t('退出登录','Sign out');menu.append(logout);header.append(trigger,menu);
+ const position=()=>{const r=trigger.getBoundingClientRect();menu.style.left=Math.max(8,Math.min(r.right-menu.offsetWidth,innerWidth-menu.offsetWidth-8))+'px';menu.style.top=Math.min(r.bottom+6,innerHeight-menu.offsetHeight-8)+'px'};
+ trigger.onclick=()=>menu.togglePopover();
+ menu.addEventListener('toggle',()=>{const open=menu.matches(':popover-open');trigger.setAttribute('aria-expanded',String(open));if(open)position()});
+ trigger.onkeydown=e=>{if(e.key==='ArrowDown'){e.preventDefault();menu.showPopover();profile.focus()}};
+ menu.onkeydown=e=>{const items=[...menu.querySelectorAll('button,a')];const index=items.indexOf(document.activeElement);if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();items[e.key==='Home'?0:e.key==='End'?items.length-1:(index+(e.key==='ArrowDown'?1:-1)+items.length)%items.length]?.focus()}if(e.key==='Escape'){e.preventDefault();menu.hidePopover();trigger.focus()}};
+ menu.addEventListener('click',e=>{if(e.target.closest('button,a')){menu.hidePopover();trigger.focus()}});
+ profile.onclick=()=>showProfile({user,save,t,after:()=>{name.textContent=user.name;const label=header.querySelector('.user-name');if(label)label.textContent=user.name},returnTo:trigger});
+}
+
+function showProfile({user,save,t,after,returnTo}){
+ if(document.querySelector('#ownProfileDialog'))return;
+ const dialog=document.createElement('dialog');dialog.id='ownProfileDialog';dialog.className='project-dialog';dialog.setAttribute('aria-labelledby','ownProfileHeading');
+ const form=document.createElement('form'),heading=document.createElement('h2');heading.id='ownProfileHeading';heading.textContent=t('个人资料设置','Profile settings');
+ const label=document.createElement('label');label.textContent=t('显示名称','Display name');const input=document.createElement('input');input.id='ownProfileName';input.required=true;input.maxLength=80;input.value=user?.name||'';input.autocomplete='nickname';label.append(input);
+ const email=document.createElement('p');email.textContent=t('邮箱：','Email: ')+(user?.email||t('未绑定','Not linked'));
+ const status=document.createElement('p');status.setAttribute('role','status');status.className='error';
+ const actions=document.createElement('div');actions.className='project-dialog-actions';const cancel=document.createElement('button');cancel.type='button';cancel.textContent=t('取消','Cancel');const submit=document.createElement('button');submit.type='submit';submit.className='primary';submit.textContent=t('保存','Save');actions.append(cancel,submit);form.append(heading,email,label,status,actions);dialog.append(form);document.body.append(dialog);
+ let busy=false;cancel.onclick=()=>dialog.close();dialog.addEventListener('cancel',e=>{e.stopPropagation();if(busy)e.preventDefault()});dialog.addEventListener('close',()=>{dialog.remove();if(returnTo.isConnected)returnTo.focus()},{once:true});
+ form.onsubmit=async e=>{e.preventDefault();if(busy)return;const name=input.value.trim();if(!name){status.textContent=t('请输入显示名称','Enter a display name');return}busy=true;submit.disabled=cancel.disabled=true;status.textContent='';try{await save(name);user.name=name;after();dialog.close()}catch(error){status.textContent=error.message}finally{busy=false;submit.disabled=cancel.disabled=false}};
+ dialog.showModal();input.focus();input.select();
+}
