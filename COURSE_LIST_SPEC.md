@@ -1,3 +1,5 @@
 # Admin course overview
 
 The Courses & materials view shows all courses as searchable cards instead of an opaque course dropdown. Each card identifies the bilingual name, enabled state, material availability and selected course. Selection uses the existing course editor and resets the business-version context. Search matches either language and the course identifier. Disabled and empty courses remain manageable. Cards wrap on small screens and support keyboard selection. Course codes and credentials are not exposed. Existing authorization and publication behavior remain unchanged.
+
+The Switch course dialog lists enabled courses previously visited by the verified identity, explicitly inherited access, and current instructor/admin assignments. History is not authorization: every ID-based switch rechecks eligibility and returns the approval flow when needed. Unknown IDs are rejected; course codes remain available for discovering new courses. No codes, private content or other users’ history are returned. A newly selected unpublished course cannot replace the active course.

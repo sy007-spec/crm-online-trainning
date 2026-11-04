@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS whitelist(id TEXT PRIMARY KEY,course_id TEXT REFERENC
 CREATE TABLE IF NOT EXISTS requests(id TEXT PRIMARY KEY,user_id TEXT REFERENCES users(id),course_id TEXT REFERENCES courses(id),ip TEXT NOT NULL,status TEXT NOT NULL,expires TEXT,actor TEXT,created TEXT NOT NULL,decided TEXT);
 CREATE INDEX IF NOT EXISTS request_access ON requests(user_id,course_id,ip,status);
 CREATE TABLE IF NOT EXISTS visits(id TEXT PRIMARY KEY,session_id TEXT NOT NULL,user_id TEXT NOT NULL,course_id TEXT NOT NULL,ip TEXT NOT NULL,agent TEXT NOT NULL,created TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS course_visits(user_id TEXT NOT NULL,course_id TEXT NOT NULL,PRIMARY KEY(user_id,course_id));
 CREATE TABLE IF NOT EXISTS events(id TEXT PRIMARY KEY,session_id TEXT NOT NULL,user_id TEXT NOT NULL,course_id TEXT NOT NULL,page_id TEXT NOT NULL,version INTEGER NOT NULL,kind TEXT NOT NULL,seconds REAL NOT NULL DEFAULT 0,scroll REAL NOT NULL DEFAULT 0,language TEXT NOT NULL,created TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS event_stats ON events(course_id,created,page_id,user_id);
 CREATE TABLE IF NOT EXISTS learning_checks(user_id TEXT,course_id TEXT,page_id TEXT,version INTEGER,understood INTEGER NOT NULL,updated TEXT NOT NULL,PRIMARY KEY(user_id,course_id,page_id,version));

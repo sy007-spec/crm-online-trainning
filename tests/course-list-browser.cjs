@@ -31,6 +31,17 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
    assert(await page.evaluate(()=>document.querySelector('.course-overview').getBoundingClientRect().right<=innerWidth));
    await page.locator('[data-course-open="pamm"]').click();await page.waitForFunction(()=>document.querySelector('[data-course-open="pamm"]')?.getAttribute('aria-pressed')==='true');
   }
+  app.store.run('UPDATE courses SET enabled=1 WHERE id=?','second-course');
+  await page.locator('#switchCourse').click();
+  await page.locator('[data-switch-course="second-course"]').waitFor();
+  assert.equal(await page.locator('[data-switch-course]').count(),2);
+  assert(await page.locator('#switchCourseCode').isVisible());
+  assert.equal(await page.locator('.switch-course-grid img').count(),0);
+  await page.locator('[data-switch-course="second-course"]').click();
+  await page.waitForFunction(()=>document.getElementById('toast')?.textContent.includes('published'));
+  assert.equal(await page.locator('[data-switch-course="second-course"]').isDisabled(),false);
+  await page.locator('[data-switch-course="pamm"]').click();
+  await page.waitForURL(url=>url.pathname==='/');await page.locator('#pageContent').waitFor();
   assert.deepEqual(errors,[]);console.log('Course overview passed: multiple courses, search, disabled/empty editing, keyboard selection, safe titles, desktop/mobile');
  }finally{await browser.close();await app.close();fs.rmSync(runtime,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1});
