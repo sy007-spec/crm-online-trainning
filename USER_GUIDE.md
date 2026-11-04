@@ -230,3 +230,11 @@
 管理员进入“课程与双语教材 → 新建课程”，填写课程标识、中英文名称和课程口令。可展开“自定义模型接入设置”，保存兼容接口地址、模型名和 API Key；托管高级空间也可选择平台全局模型。选择一个 TXT、MD、CSV、文字 PDF 或 DOCX 附件后点击“生成并预览”。附件正文会发送给所选供应商。审核并修改中英文 Markdown，可下载两份 MD，再创建课程。生成或创建都不会自动发布；仍需在课程中确认正式可见修订。扫描件请先做 OCR。
 
 托管空间的图片与全局模型额度由全部用户共享。达到空间限制后提示联系空间管理员，不能继续新增相应资源，已有教材和图片仍按权限可读。自定义模型使用自己的供应商额度。
+
+---
+
+## 品牌说明 · Brand note
+
+本界面已按 SEII「温暖陪伴型导师」品牌规范 v1.0 做视觉与文案升级：主色为蜂蜜琥珀与奶油底，吉祥物「小圆 / Mentor Yuan」会在加载、首次进入、空状态和完成任务时出现，陪伴语为短句、中英双语。产品功能、操作流程与数据隔离保持不变。
+
+This interface has been refreshed under the SEII "Warm Mentor" brand v1.0: honey-amber and cream tones, with the mascot "YuanYuan" appearing on loading, first access, empty states and completion moments. Product behaviour, workflows and data isolation are unchanged.
