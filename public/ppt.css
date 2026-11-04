@@ -34,3 +34,7 @@ body{margin:0}#pptRoot{min-height:100dvh;display:flex;flex-direction:column}.ppt
 .top .breadcrumbs a,.top .breadcrumbs span,.ppt-top .breadcrumbs a,.ppt-top .breadcrumbs span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ppt-top>div:first-child:has(.breadcrumbs)>strong,.ppt-top>div:first-child:has(.breadcrumbs)>span{display:none}
 @media(max-width:820px){.top .breadcrumbs li,.ppt-top .breadcrumbs li{max-width:120px}}
+
+/* Public snapshots keep a minimal responsive presentation shell. */
+#publicPpt{min-height:100dvh;display:flex;flex-direction:column}#publicPpt .ppt-top{justify-content:space-between}#publicPpt .ppt-top>strong{min-width:0;overflow-wrap:anywhere}#publicPpt .ppt-canvas{padding:20px}#publicPpt .ppt-footer{position:sticky;bottom:0;z-index:10}
+@media(max-width:820px){#publicPpt .ppt-canvas{padding:8px}}
