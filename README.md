@@ -1,4 +1,4 @@
-# PPTInPublic
+# TeachInPublic
 
 Open-source online PPT, with course access under your control.
 
