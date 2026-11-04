@@ -12,7 +12,9 @@
     "check": "node --check src/server.mjs && node --check public/app.js"
   },
   "dependencies": {
+    "@napi-rs/canvas": "1.1.0",
     "geoip-country": "5.0.202610310241",
+    "jszip": "3.10.2",
     "mammoth": "1.13.0",
     "mermaid": "12.2.0",
     "pdfjs-dist": "6.5.438",
