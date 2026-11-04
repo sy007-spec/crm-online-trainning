@@ -1,0 +1,3 @@
+# Self-service account security
+
+Profile settings retain nickname editing and expose only the signed-in account's applicable security methods. Changing a security question/answer or login password requires the current secret, CSRF protection, bounded attempts, confirmation and existing strength rules. No secret or hash is returned. Successful changes invalidate other sessions and keep learning content and identity unchanged. Hosted account security is owned by the hosting identity service; classroom owners use its verified portal flow rather than changing the classroom administrator credential.
