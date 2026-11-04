@@ -17,5 +17,5 @@ export function larkLogin(store,{configuration,identities,fetcher=fetch}){
  store.transaction(()=>{if(!existing){if(store.get('SELECT open_id FROM lark_identities WHERE app=? AND user_id=?',row.app,user))fail(409,'This account is already linked; contact an administrator to change it');store.run('INSERT INTO lark_identities VALUES(?,?,?,?)',row.app,profile.open_id,user,store.now())}if(row.admin&&!store.get('SELECT user_id FROM user_admins WHERE user_id=?',user))store.run('INSERT INTO user_admins VALUES(?,?,?)',user,'admin:'+row.user,store.now());store.run('UPDATE users SET lark_id=?,tenant=? WHERE id=?',profile.open_id,profile.tenant_key||'',user);store.audit(user,'lark.identity-login',{linked:!existing})});
  return {user,destination:row.destination};
  }
- return {start,complete,available:()=>{try{cfg();return true}catch{return false}}};
+ return {start,complete,linked:user=>{try{return !!store.get('SELECT user_id FROM lark_identities WHERE app=? AND user_id=?',appKey(cfg()),user)}catch{return false}},available:()=>{try{cfg();return true}catch{return false}}};
 }

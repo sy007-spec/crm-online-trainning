@@ -12,7 +12,7 @@ export function compactHeader(header=document.querySelector('header')){
 }
 
 // Keep the account entry at the far right; the popover escapes toolbar clipping.
-export function accountMenu({user,save,security,header=document.querySelector('header')}){
+export function accountMenu({user,save,security,identity,header=document.querySelector('header')}){
  const logout=header?.querySelector('#logout');if(!logout||header.querySelector('#accountMenuButton'))return;
  const zh=document.documentElement.lang.startsWith('zh'),t=(a,b)=>zh?a:b;
  const trigger=document.createElement('button');trigger.type='button';trigger.id='accountMenuButton';trigger.className='header-icon account-menu-trigger';trigger.setAttribute('aria-label',t('账户菜单','Account menu'));trigger.setAttribute('aria-expanded','false');trigger.setAttribute('aria-controls','accountMenu');trigger.setAttribute('aria-haspopup','true');
@@ -28,10 +28,10 @@ export function accountMenu({user,save,security,header=document.querySelector('h
  trigger.onkeydown=e=>{if(e.key==='ArrowDown'){e.preventDefault();menu.showPopover();profile.focus()}};
  menu.onkeydown=e=>{const items=[...menu.querySelectorAll('button,a')];const index=items.indexOf(document.activeElement);if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();items[e.key==='Home'?0:e.key==='End'?items.length-1:(index+(e.key==='ArrowDown'?1:-1)+items.length)%items.length]?.focus()}if(e.key==='Escape'){e.preventDefault();menu.hidePopover();trigger.focus()}};
  menu.addEventListener('click',e=>{if(e.target.closest('button,a')){menu.hidePopover();trigger.focus()}});
- profile.onclick=()=>showProfile({user,save,security,t,after:()=>{name.textContent=user.name;const label=header.querySelector('.user-name');if(label)label.textContent=user.name},returnTo:trigger});
+ profile.onclick=()=>showProfile({user,save,security,identity,t,after:()=>{name.textContent=user.name;const label=header.querySelector('.user-name');if(label)label.textContent=user.name},returnTo:trigger});
 }
 
-function showProfile({user,save,security,t,after,returnTo}){
+function showProfile({user,save,security,identity,t,after,returnTo}){
  if(document.querySelector('#ownProfileDialog'))return;
  const dialog=document.createElement('dialog');dialog.id='ownProfileDialog';dialog.className='project-dialog';dialog.setAttribute('aria-labelledby','ownProfileHeading');
  const form=document.createElement('form'),heading=document.createElement('h2');heading.id='ownProfileHeading';heading.textContent=t('个人资料设置','Profile settings');
@@ -42,5 +42,6 @@ function showProfile({user,save,security,t,after,returnTo}){
  let busy=false;cancel.onclick=()=>dialog.close();dialog.addEventListener('cancel',e=>{e.stopPropagation();if(busy)e.preventDefault()});dialog.addEventListener('close',()=>{dialog.remove();if(returnTo.isConnected)returnTo.focus()},{once:true});
  form.onsubmit=async e=>{e.preventDefault();if(busy)return;const name=input.value.trim();if(!name){status.textContent=t('请输入显示名称','Enter a display name');return}busy=true;submit.disabled=cancel.disabled=true;status.textContent='';try{await save(name);user.name=name;after();dialog.close()}catch(error){status.textContent=error.message}finally{busy=false;submit.disabled=cancel.disabled=false}};
  if(security){const button=document.createElement('button');button.type='button';button.id='profileSecurity';button.textContent=t('修改安全设置或密码','Change security settings or password');button.onclick=async()=>{button.disabled=true;try{await securityPanel({...security,t})}catch(error){status.textContent=error.message}finally{button.disabled=false}};dialog.append(button)}
+ if(identity){const section=document.createElement('section');section.className='profile-identity';const title=document.createElement('h3');title.textContent='飞书 / Lark';const description=document.createElement('p');description.id='profileLarkStatus';description.textContent=identity.linked?t('已绑定，可扫码登录','Linked. Scan to sign in'):identity.enabled?t('尚未绑定。扫码关联当前邮箱账号。','Not linked. Scan to link this email account.'):(identity.setupText||t('课堂尚未开通飞书 / Lark 登录，请联系课堂主。','Feishu / Lark sign-in is not configured. Contact the classroom owner.'));const button=document.createElement('button');button.type='button';button.id='profileLarkBind';button.textContent=t(identity.linked?'扫码验证绑定':'扫码绑定飞书 / Lark',identity.linked?'Verify linked identity':'Scan to link Feishu / Lark');button.disabled=!identity.enabled;button.onclick=()=>{if(input.value.trim()!==(user?.name||'')){status.textContent=t('请先保存昵称修改，再绑定账号。','Save your name change before linking.');return}identity.bind(button)};section.append(title,description,button);if(identity.configureUrl){const link=document.createElement('a');link.href=identity.configureUrl;link.className='button';link.id='profileLarkSetup';link.textContent=t('配置登录与备份应用','Configure sign-in and backup app');section.append(link)}dialog.append(section)}
  dialog.showModal();input.focus();input.select();
 }

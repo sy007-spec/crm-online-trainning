@@ -1,10 +1,12 @@
-export function mountLarkLogin({root,session,api,t,toast}){
- if(!session.larkEnabled||root.querySelector('#scanLarkLogin'))return;
- const target=root.querySelector('.auth')||root.querySelector('header .actions');if(!target)return;
- const button=document.createElement('button');button.id='scanLarkLogin';button.type='button';button.textContent=t(session.larkLinked?'飞书 / Lark 已绑定':'飞书 / Lark 扫码登录或绑定',session.larkLinked?'Feishu / Lark linked':'Scan with Feishu / Lark to sign in or link');target.append(button);
- button.onclick=async()=>{const destination=new URL(location.href).searchParams.get('signin')==='course-admin'?'/admin':location.pathname;const popup=window.open('about:blank','trainingLarkLogin','popup,width=520,height=740');if(!popup){toast(t('请允许弹出授权窗口','Allow the authorization pop-up'));return}button.disabled=true;
+export async function startLarkLogin({button,api,t,toast}){const destination=new URL(location.href).searchParams.get('signin')==='course-admin'?'/admin':location.pathname;const popup=window.open('about:blank','trainingLarkLogin','popup,width=520,height=740');if(!popup){toast(t('请允许弹出授权窗口','Allow the authorization pop-up'));return}button.disabled=true;
  try{popup.opener=null;const r=await api('/api/lark/oauth/start',{method:'POST',body:{destination}});popup.location.replace(r.url);const deadline=Date.now()+600000;const timer=setInterval(()=>{if(popup.closed||Date.now()>deadline||!button.isConnected){clearInterval(timer);button.disabled=false;return}try{if(popup.location.origin===location.origin&&new URL(popup.location.href).searchParams.get('lark')==='linked'){clearInterval(timer);popup.close();location.assign(destination+'?lark=linked')}}catch{}},500)}catch(e){popup.close();button.disabled=false;toast(e.message)}
- };
+
+}
+export function mountLarkLogin({root,session,api,t,toast}){
+ if(root.querySelector('#scanLarkLogin'))return;
+ const target=root.querySelector('.auth')||root.querySelector('header .actions');if(!target)return;
+ const button=document.createElement('button');button.id='scanLarkLogin';button.type='button';button.textContent=t(session.larkLinked?'飞书 / Lark 已绑定':'飞书 / Lark 扫码登录或绑定',session.larkLinked?'Feishu / Lark linked':'Scan with Feishu / Lark to sign in or link');target.append(button);if(!session.larkEnabled){button.disabled=true;button.title=t('课堂尚未配置飞书 / Lark 登录，请联系课堂主。','Feishu / Lark sign-in is not configured. Contact the classroom owner.');if(target.matches('.auth')){const note=document.createElement('p');note.className='small muted';note.id='larkSetupNotice';note.textContent=button.title;target.append(note)}return}
+ button.onclick=()=>startLarkLogin({button,api,t,toast});
 }
 export async function chooseLarkCourse({root,session,api,t,esc,localized,toast}){
  if(location.pathname!=='/'||new URL(location.href).searchParams.get('lark')!=='linked')return false;
