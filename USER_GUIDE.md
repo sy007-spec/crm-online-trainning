@@ -230,3 +230,10 @@
 管理员进入“课程与双语教材 → 新建课程”，填写课程标识、中英文名称和课程口令。可展开“自定义模型接入设置”，保存兼容接口地址、模型名和 API Key；托管高级空间也可选择平台全局模型。选择文本、Markdown、CSV、HTML、PDF（含扫描）、DOCX、PPTX、XLSX、PNG、JPEG 或 WebP 后点击“生成并预览”。文字和图片会发送给所选大模型；含图文档需要视觉模型。模型进行OCR并优先用Mermaid重建有依据的图形关系，无法判断的内容需标注不确定。审核并修改中英文 Markdown，可下载两份 MD，再创建课程。生成或创建都不会自动发布；仍需在课程中确认正式可见修订。收费转换沿用Markdown单文件大小（基础款2MB、高级款10MB）；最多20张图片或PDF页面、15万字符，超限请拆分；旧版DOC/PPT/XLS、加密文件或不支持的嵌入图片需先另存为PDF。
 
 托管空间的图片额度由全部用户共享，达到上限不影响已有教材和图片阅读。基础套餐仅使用自有大模型接入；高级套餐可选自有接入或平台全局接入。平台全局接入不承诺 token 提供量或随时可用，繁忙、故障或维护时可由用户自行改选自有接入；不会自动切换供应商。自有模型的费用及使用条件遵循对应供应商。
+
+
+### 人工讨论翻译 / Human discussion translation
+
+讲师和学员的文字留言均保留原文。点击留言下的“译 English”或“译 中文”可使用课堂当前启用的模型补齐对应语言；译文保存后随界面语言切换，也可点击“原文”查看。译文标注为机器翻译，不代表讲师审核；原文编辑后旧译文自动失效。只有有权查看原讨论的用户才能请求或读取翻译，译文沿用讨论可见范围。无可用模型或翻译失败时，原文不变。
+
+Instructor and learner messages retain their original text. Use “译 English” or “译 中文” below a message to translate with the classroom’s enabled model. Saved translations follow the interface language; “Original” always restores the original text. Machine translations are labelled and are not instructor-reviewed. Editing the original invalidates its old translation. Only readers authorized for the discussion may request or read translations; failures never overwrite the original.

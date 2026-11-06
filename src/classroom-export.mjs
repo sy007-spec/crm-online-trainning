@@ -1,3 +1,4 @@
+import {digest} from './security.mjs';
 import {DatabaseSync} from 'node:sqlite';
 
 // Export only teaching content that the classroom administrator can access.
@@ -16,6 +17,7 @@ export function classroomExport(file){
   }
   for(const row of rows('SELECT q.* FROM questions q WHERE q.course_id=? AND '+visible+' ORDER BY q.rowid',course)){
    yield {type:'question',data:row};
+   if(!row.removed&&exists('discussion_translations'))for(const translation of rows('SELECT * FROM discussion_translations WHERE question_id=? AND fingerprint=?',row.id,digest(row.body)))yield {type:'discussion_translations',data:translation};
    if(exists('discussion_languages'))for(const language of rows('SELECT * FROM discussion_languages WHERE question_id=?',row.id))yield {type:'discussion_languages',data:language};
    if(exists('discussion_context')){const meta=db.prepare('SELECT * FROM discussion_context WHERE root_id=?').get(row.root_id||row.id);if(meta&&row.id===(row.root_id||row.id))yield {type:'discussion_context',data:meta};}
    if(exists('question_edits'))for(const edit of rows('SELECT * FROM question_edits WHERE question_id=? ORDER BY rowid',row.id))yield {type:'question_edits',data:edit};
