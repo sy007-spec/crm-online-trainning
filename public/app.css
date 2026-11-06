@@ -198,3 +198,5 @@ dialog:has(.reading-share){width:min(560px,calc(100vw - 24px));overflow:auto}
 .preparation-editors{display:grid;grid-template-columns:1fr 1fr;gap:16px}.preparation-editors label{min-width:0}.preparation-editors textarea{width:100%;box-sizing:border-box;font-family:monospace}@media(max-width:700px){.preparation-editors{grid-template-columns:1fr}}
 
 .preparation-editors[hidden]{display:none}#prepReference textarea{width:100%;box-sizing:border-box;font-family:monospace}
+
+.knowledge-evidence{white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit}#prepKnowledge{margin-block:16px}

@@ -2,7 +2,7 @@ import {DatabaseSync} from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
 import {uid,token,digest,passwordHash} from './security.mjs';
-export function openStore(runtime,seedMaterial=null,emptyCourses=false){fs.mkdirSync(runtime,{recursive:true,mode:0o700});const db=new DatabaseSync(path.join(runtime,'training.sqlite'));db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
+export function openStore(runtime,seedMaterial=null,emptyCourses=false){fs.mkdirSync(runtime,{recursive:true,mode:0o700});const db=new DatabaseSync(path.join(runtime,'training.sqlite'),{allowExtension:true});db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,device_hash TEXT UNIQUE NOT NULL,name TEXT NOT NULL DEFAULT '',contact TEXT NOT NULL DEFAULT '',lark_id TEXT,tenant TEXT,created TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions(id TEXT PRIMARY KEY,user_id TEXT REFERENCES users(id),csrf TEXT NOT NULL,ip TEXT NOT NULL,course_id TEXT,admin INTEGER NOT NULL DEFAULT 0,expires TEXT NOT NULL,created TEXT NOT NULL);
