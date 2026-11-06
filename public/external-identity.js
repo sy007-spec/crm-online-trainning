@@ -1,0 +1,23 @@
+export async function startExternalLogin({button,api,t,toast}){const destination=new URL(location.href).searchParams.get('signin')==='course-admin'?'/admin':location.pathname==='/instructor'?'/':location.pathname;const popup=window.open('about:blank','trainingExternalLogin','popup,width=520,height=740');if(!popup){toast(t('请允许弹出授权窗口','Allow the authorization pop-up'));return}button.disabled=true;
+ try{popup.opener=null;const r=await api('/api/identity/start',{method:'POST',body:{destination}});popup.location.replace(r.url);const deadline=Date.now()+600000;const timer=setInterval(()=>{if(popup.closed||Date.now()>deadline||!button.isConnected){clearInterval(timer);button.disabled=false;return}try{if(popup.location.origin===location.origin&&new URL(popup.location.href).searchParams.get('identity')==='linked'){clearInterval(timer);popup.close();location.assign(destination+'?identity=linked')}}catch{}},500)}catch(e){popup.close();button.disabled=false;toast(e.message)}
+
+}
+export function mountExternalLogin({root,session,api,t,toast}){
+ if(!session.identity||root.querySelector('#scanExternalLogin'))return;
+ const target=root.querySelector('.auth')||root.querySelector('header .actions');if(!target)return;
+ const button=document.createElement('button');button.id='scanExternalLogin';button.type='button';button.textContent=t(session.identity.label.zh,session.identity.label.en)+' · '+t(session.identity.linked?'已绑定':session.identity.action?.zh||'登录或绑定',session.identity.linked?'Linked':session.identity.action?.en||'Sign in or link');target.append(button);if(!session.identity?.enabled){button.disabled=true;button.title=t('课堂尚未配置此登录方式，请联系课堂主。','This sign-in method is not configured. Contact the classroom owner.');if(target.matches('.auth')){const note=document.createElement('p');note.className='small muted';note.id='identitySetupNotice';note.textContent=button.title;target.append(note)}return}
+ button.onclick=()=>startExternalLogin({button,api,t,toast});
+}
+export async function chooseIdentityCourse({root,session,api,t,esc,localized,toast}){
+ if(location.pathname!=='/'||new URL(location.href).searchParams.get('identity')!=='linked')return false;
+ history.replaceState(null,'','/');const choices=await api('/api/my-courses');if(!choices.length)return false;
+ const dialog=document.createElement('dialog');dialog.className='web-dialog';let selected=choices.find(c=>c.id===session.lastCourse)||choices.find(c=>c.allowed)||choices[0],remaining=5,timer,entering=false;
+ dialog.innerHTML='<h2>'+t('欢迎回来，选择课程','Welcome back. Choose a course')+'</h2><div class="course-grid">'+choices.map(c=>'<button type="button" data-identity-course="'+esc(c.id)+'">'+esc(localized(c.title))+(c.allowed?'':' · '+t('需审批','Approval required'))+'</button>').join('')+'</div><p id="identityCountdown" role="status"></p><div class="actions"><button id="identityEnter">'+t('立即进入','Enter now')+'</button><button id="identityPause">'+t('取消自动进入','Cancel automatic entry')+'</button><button id="identityNew">'+t('输入新课程口令','Enter another course code')+'</button></div>';
+ document.body.append(dialog);dialog.showModal();
+ const update=()=>{dialog.querySelector('#identityCountdown').textContent=localized(selected.title)+(selected.allowed?' · '+t(remaining+'秒后进入', 'Opening in '+remaining+'s'):' · '+t('请申请访问许可','Request access approval'));for(const b of dialog.querySelectorAll('[data-identity-course]'))b.setAttribute('aria-pressed',String(b.dataset.identityCourse===selected.id))};
+ const stop=()=>{clearInterval(timer);remaining=0;dialog.querySelector('#identityCountdown').textContent=t('已暂停，请选择课程后进入','Paused. Choose a course and enter')};
+ const enter=async()=>{if(entering)return;entering=true;clearInterval(timer);try{await api('/api/switch-course',{method:'POST',body:{course:selected.id}});location.assign('/')}catch(e){entering=false;stop();toast(e.message)}};
+ const start=()=>{clearInterval(timer);remaining=5;update();if(selected.allowed)timer=setInterval(()=>{if(!dialog.open||document.hidden){stop();return}remaining--;if(remaining<=0)enter();else update()},1000)};
+ for(const b of dialog.querySelectorAll('[data-identity-course]'))b.onclick=()=>{selected=choices.find(c=>c.id===b.dataset.identityCourse);stop();update();dialog.querySelector('#identityCountdown').textContent=localized(selected.title)};
+ dialog.querySelector('#identityEnter').onclick=enter;dialog.querySelector('#identityPause').onclick=stop;dialog.querySelector('#identityNew').onclick=()=>{stop();dialog.close();dialog.remove()};dialog.addEventListener('close',stop);dialog.addEventListener('cancel',stop);start();return true;
+}

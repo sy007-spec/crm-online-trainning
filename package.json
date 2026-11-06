@@ -12,6 +12,7 @@
     "check": "node --check src/server.mjs && node --check public/app.js"
   },
   "dependencies": {
+    "@huggingface/transformers": "3.8.1",
     "@napi-rs/canvas": "1.1.0",
     "geoip-country": "5.0.202610310241",
     "jszip": "3.10.2",
@@ -19,13 +20,15 @@
     "mermaid": "12.2.0",
     "pdfjs-dist": "6.5.438",
     "qrcode": "1.5.4",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "sqlite-vec": "0.1.7"
   },
   "devDependencies": {
     "ssh2": "1.17.0"
   },
   "overrides": {
-    "ip-address": "10.7.5"
+    "ip-address": "10.7.5",
+    "sharp": "$sharp"
   },
   "license": "MIT"
 }

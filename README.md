@@ -57,23 +57,16 @@ PPT reading links created with the first-open policy start a separate duration w
 Hosted content storage is 100 MB (Basic) / 500 MB (Advanced); sources, parsed copies, revisions, images, discussions and restore archives count. Private notes and private discussions are excluded from merchant cloud backups and restore. The hosting platform alone orchestrates OAuth, schedules and administrator-only restore approval; the core exports an allowlisted teaching snapshot and applies nonpublishing, transactional imports.
 
 
-### 飞书 / Lark 账号登录与课程选择
+### 外部身份与课程选择
 
-管理员配置应用凭据、区域并启用登录，在开放平台登记本部署的 /api/lark/oauth/callback，申请 contact:user.email:readonly。课程入口、管理员和讲师登录页提供扫码入口；已登录用户也可绑定。首次关联要求飞书返回有效邮箱，已登录账户必须邮箱一致；身份键包含应用及区域，跨应用或跨课堂不共享绑定。管理员只有在已通过系统管理员验证的会话中绑定，才能保留该管理身份；普通用户扫码不会获得管理员权限。
+独立部署使用邮箱账户登录，不内置供应商扫码登录。托管服务可安装可信服务端身份适配器；配置协议见 [EXTERNAL_IDENTITY_SPEC.md](EXTERNAL_IDENTITY_SPEC.md)。供应商应用、授权回调和绑定实现由托管库维护。
 
-OAuth 验证成功可作为登录证明；课程口令、阅读同意、IP及访问审批仍独立生效。首次访客无课程时必须输入口令。再次扫码后显示当前账户的课程列表，优先选择最后学习课程，有当前访问权限时5秒后进入；取消、切换选项、关闭或切到后台会停止倒计时。无权限课程不自动进入，可按原规则申请访问。绑定浏览器/IP的许可不自动转移到新设备。学习记录按原邮箱用户保留。
+外部验证通过后，课程口令、阅读同意、IP及访问审批仍独立生效。首次访客输入课程口令；返回用户可选择已关联课程，优先最后学习课程，有权限时五秒后进入。取消、切换选项、关闭或切到后台停止倒计时。绑定浏览器/IP的许可不会转移到新设备。
 
-个人资料设置提供飞书/Lark绑定状态及扫码绑定按钮。未配置登录应用时，学习入口保留禁用的扫码按钮并解释原因；有管理权限的用户可从个人资料进入配置。绑定状态按当前应用核对，切换应用后不会错误显示旧应用已经绑定。
+个人设置按适配器描述显示身份状态与绑定操作。未安装适配器时不显示外部身份入口。原统计卡片和卡片审批继续独立配置。
 
+### AI 课程答疑
 
-### 课程 AI 问答与课程知识库
+提问会自动使用当前已发布课程资料生成回答，显示引用篇章；学习者可以继续追问。优先使用课堂已配置的自有模型，未配置时使用套餐允许的平台模型。无模型、超时或资料不足会明确显示，问题始终保留。教材更新后旧答案需重新生成；AI回答不替代讲师审核。纯图片问题请补充文字描述。详细边界见 [AI_TUTOR_SPEC.md](AI_TUTOR_SPEC.md)。
 
-自建版无需托管平台或外部向量数据库：管理员在“课程智能问答”中配置 Gemini 密钥池，默认模型为 gemini-flash-latest；学习者在“笔记与问答 → 课程AI问答”提问。一次请求生成中英文答案，语言切换复用本次结果。答案附可核对的原文摘录，教材引用可跳转页面；无检索证据、模型明确证据不足或引用校验失败时，不输出肯定答案。
-
-仅检索当前获准课程默认业务版本的当前正式修订，不检索草稿、讲师稿、私人笔记或讨论。课程 Markdown 无需重复上传；管理员可上传已审核的 UTF-8 MD/TXT 补充资料（每份200KB、每课程业务版本最多30份），绑定当前正式修订。教材升级后旧修订补充资料不参与新答案，需重新审核上传。检索采用本地中英文关键词片段排序，不是向量语义检索；引用校验不能保证答案事实完全正确，仍需人工核对。问题及相关摘录会发给 Google；回答只保存在当前浏览器页面内存，不自动公开到讨论。
-
-密钥池每项包含项目组、名称和 Key；同项目的多个 Key 必须使用相同项目组。轮询选取可用 Key，401/403/408/429、服务端错误、超时或无效响应会使项目组冷却，默认24小时（可配置1–168小时），随后请求可重新尝试。每次最多尝试两个项目组，每次最长25秒；无人可用时明确报错，不伪造答案。Google 限额按项目而非 Key 计算，轮询不增加同项目额度。管理页显示每组冷却结束时间；本功能不依赖飞书通知或后台探测。
-
-API Key 在运行数据库中使用 AES-256-GCM 加密，解密密钥为运行目录的 course-ai.key（仅运行账户可读写）。备份时必须同时保护数据库和该文件，二者一起恢复；单独复制数据库无法恢复模型凭据。管理员接口不回传密钥，不记录问题或回答正文到审计。后台使用本部署管理员权限管理配置与知识库，学习接口沿用课程审批、安全验证、CSRF、课程隔离，并在模型返回时再次核对访问资格与正式修订。
-
-Google 文档：[模型别名说明](https://developers.googleblog.com/continuing-to-bring-you-our-latest-models-with-an-improved-gemini-2-5-flash-and-flash-lite-release/)、[按项目计算限额](https://ai.google.dev/gemini-api/docs/rate-limits)。最新模型别名可能随 Google 更新，管理员可以改为明确模型版本。
+课程知识库：筹建中的原始资料须审核批准后才能用于学员答疑。采用本地多语言向量+关键词检索，答案附可核对原文，依据不足拒答。详见 [课程知识库规格](COURSE_KNOWLEDGE_SPEC.md)。首次使用需下载固定版多语言向量模型，缓存位置通过 TRAINING_MODEL_CACHE 指定。
