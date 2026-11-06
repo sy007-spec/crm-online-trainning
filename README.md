@@ -70,3 +70,16 @@ Hosted content storage is 100 MB (Basic) / 500 MB (Advanced); sources, parsed co
 提问会自动使用当前已发布课程资料生成回答，显示引用篇章；学习者可以继续追问。优先使用课堂已配置的自有模型，未配置时使用套餐允许的平台模型。无模型、超时或资料不足会明确显示，问题始终保留。教材更新后旧答案需重新生成；AI回答不替代讲师审核。纯图片问题请补充文字描述。详细边界见 [AI_TUTOR_SPEC.md](AI_TUTOR_SPEC.md)。
 
 课程知识库：筹建中的原始资料须审核批准后才能用于学员答疑。采用本地多语言向量+关键词检索，答案附可核对原文，依据不足拒答。详见 [课程知识库规格](COURSE_KNOWLEDGE_SPEC.md)。首次使用需下载固定版多语言向量模型，缓存位置通过 TRAINING_MODEL_CACHE 指定。
+
+
+### Gemini 轮询与一次生成双语答复
+
+管理员在“Gemini密钥池”配置 Google 项目组、名称和 API Key，默认模型 gemini-flash-latest。启用后原有课程问答入口优先使用此池；无需建立另一套课程问答或知识库。问题与答案继续按原讨论可见范围保存，检索沿用正式教材及获批知识库，排除讲师备注、未获批资料和其他课程。
+
+一次生成中文和英文答案，再对两种语言共同执行依据审核；不会为了切换语言重新生成。答案内中文/English按钮及页面语言切换均复用已保存答案。教材或知识来源更新仍使旧答案失效，失败时保留问题供重试。
+
+每个 Key 指定项目组，同一 Google 项目的 Key 必须归同组。轮询跳过冷却组；401/403/408/429、5xx、网络异常或无效JSON触发默认24小时冷却（1–168小时可配）。到期后下一请求重新尝试，每个请求最多尝试两个项目组、单次最多25秒，并受整个答疑45秒期限约束；管理页显示冷却结束时间。本连接池不进行后台探测或飞书通知。Google 限额按项目而非 Key 计算，多个 Key 不增加同项目额度。
+
+密钥采用 AES-256-GCM 加密后存入数据库；解密密钥为运行目录 course-ai.key，仅运行账户可读写。务必将运行数据库与该文件作为私有备份一起恢复，不提交到 Git。接口只返回配置状态，不回传 Key。本地知识向量模型需要持久缓存；默认容器内存上限为1GB，初次构建索引需要下载模型。
+
+参考：[Google latest 别名说明](https://developers.googleblog.com/continuing-to-bring-you-our-latest-models-with-an-improved-gemini-2-5-flash-and-flash-lite-release/)、[项目级限额](https://ai.google.dev/gemini-api/docs/rate-limits)。

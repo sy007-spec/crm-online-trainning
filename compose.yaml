@@ -17,7 +17,7 @@ services:
       - /tmp:size=16m,noexec,nosuid
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    mem_limit: 384m
+    mem_limit: 1024m
     logging:
       driver: json-file
       options:
