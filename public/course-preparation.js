@@ -1,5 +1,5 @@
 import {webConfirm} from './web-dialog.js';
-import {esc} from './render.js';
+import {esc,markdown} from './render.js';
 
 export async function openPreparation({course,api,dialog,t}){
  let knowledgeBusiness='v1',knowledgeRequest=0;
@@ -29,4 +29,16 @@ export async function openPreparation({course,api,dialog,t}){
  const closeForm=modal.querySelector('form[method="dialog"]');closeForm?.addEventListener('submit',cancel);
  const unload=e=>{if(dirty||flight){e.preventDefault();e.returnValue=''}};window.addEventListener('beforeunload',unload);
  modal.addEventListener('close',()=>{closed=true;clearTimeout(timer);modal.removeEventListener('cancel',cancel);closeForm?.removeEventListener('submit',cancel);window.removeEventListener('beforeunload',unload)},{once:true});render();
+}
+
+export async function openSupplement({course,businessVersion='v1',api,dialog,t}){
+ const info=await api('/api/preparation/knowledge?'+new URLSearchParams({course,businessVersion}));
+ dialog('<h2>'+t('补充课程材料','Add course material')+'</h2><p>'+esc(course)+' · '+esc(businessVersion)+'</p><label>'+t('资料名称','Title')+'<input id="suppTitle" maxlength="120"></label><label>Markdown<textarea id="suppText" rows="12"></textarea></label><details open><summary>'+t('预览','Preview')+'</summary><div id="suppPreview" class="markdown"></div></details>'+(info.canApprove&&info.revision?'<label><input type="checkbox" id="suppApprove" checked>'+t('确认原文可用于学员答疑，自动更新知识库','Approve source for learner Q&A and update index')+'</label>':'<p>'+t('资料保存后待审核授权用于答疑。','Saved sources require approval for learner Q&A.')+'</p>')+'<label><input type="checkbox" id="suppAuto">'+t('保存后重新生成课程大纲与教材草稿','Generate a new outline and material draft after saving')+'</label><p>'+t('生成会将本课程全部原始资料发送给课堂模型；结果需审核并单独发布。','Generation sends all course reference sources to the classroom model. Review and publish the draft separately.')+'</p><div class="actions"><button id="suppSave" class="primary">'+t('确认添加资料','Confirm and add')+'</button><button id="suppGenerate">'+t('根据已保存资料生成教材','Generate from saved sources')+'</button></div><p id="suppStatus" role="status"></p>');
+ const $=id=>document.getElementById(id);let saved=null,busy=false;
+ $('suppText').oninput=()=>{$('suppPreview').innerHTML=markdown($('suppText').value)};
+ const status=text=>{if($('suppStatus'))$('suppStatus').textContent=text};
+ const generate=async()=>{status(t('正在生成大纲和教材，请稍候…','Generating outline and material…'));const result=await api('/api/preparation/generate',{method:'POST',body:{course,businessVersion}});status(t('已保存教材草稿，需审核发布：R','Draft saved; review and publish: R')+result.version)};
+ const run=fn=>async()=>{if(busy)return;busy=true;const fields=[...document.getElementById('dialogContent').querySelectorAll('input,textarea,button')];fields.forEach(x=>x.disabled=true);try{await fn()}catch(e){status((saved?t('资料已保存。','Source saved. '):'')+e.message)}finally{busy=false;fields.forEach(x=>x.disabled=false)}};
+ $('suppSave').onclick=run(async()=>{if(!$('suppText').value.trim()||!$('suppTitle').value.trim())throw Error(t('请填写名称和正文','Enter a title and source text'));saved=await api('/api/preparation',{method:'POST',body:{course,kind:'reference',title:$('suppTitle').value,raw:$('suppText').value,id:saved?.id,baseRevision:saved?.revision}});status(t('资料已保存','Source saved'));if($('suppApprove')?.checked){await api('/api/preparation/knowledge',{method:'POST',body:{course,businessVersion,id:saved.id,baseRevision:saved.revision,basePublished:info.revision,approved:true,confirm:true}});status(t('资料已保存，正在更新知识库…','Source saved; updating knowledge index…'));await api('/api/preparation/knowledge/build',{method:'POST',body:{course,businessVersion}});status(t('资料与知识库已更新','Source and knowledge index updated'))}if($('suppAuto').checked)await generate()});
+ $('suppGenerate').onclick=run(generate);
 }
