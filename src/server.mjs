@@ -1,3 +1,4 @@
+import {knowledgeSync} from './knowledge-sync.mjs';
 import {courseKnowledge} from './course-knowledge.mjs';
 import {coursePreparation} from './course-preparation.mjs';
 import {aiTutor} from './ai-tutor.mjs';
@@ -42,6 +43,7 @@ export function createApp(options={}){
  const externalAuth=options.externalIdentity?.({store,identities})||{available:()=>false,linked:()=>false,describe:()=>null,start:()=>fail(503,'External identity unavailable'),complete:()=>fail(503,'External identity unavailable')};
  const business=businessVersions(store),revisions=materialRevisions(store,business,options.hosting),ppt=pptShares(store,{business,origin,hosting:options.hosting}),publicPpt=publicPresentations(store,{business,origin,hosting:options.hosting,enabled:options.publicPresentations!==false});
  const knowledge=courseKnowledge(store,{material:c=>materialVersion(c,c.published),embedding:options.embedding});
+ const knowledgeWorker=knowledgeSync(store,{knowledge,enabled:options.knowledgeSync??options.scheduler!==false});
  const tutor=aiTutor(store,{hosting:options.hosting,quota,fetcher:options.aiFetch,knowledge});
  const json=(res,status,value,extra={})=>{res.writeHead(status,{'content-type':'application/json;charset=utf-8','cache-control':'no-store',...extra});res.end(JSON.stringify(value))};
  const actor=s=>s.delegatedVersionActor|| (s.admin?'admin:'+s.user_id:s.staff?'instructor:'+s.staff.id:s.user_id);const audit=(s,action,detail)=>store.audit(actor(s),action,detail);const caps=(s,c)=>roles.capabilities(s,c.id||c);const teacher=(s,c)=>caps(s,c).present;
@@ -243,6 +245,6 @@ export function createApp(options={}){
   }catch(e){if(e.message?.includes('classroom_storage_full'))Object.assign(e,{status:413,code:'storage_full',message:'Classroom storage limit reached'});const status=e.status||500;if(status>=500)console.error(JSON.stringify({event:'request.failed',path:p,status,error:e.message}));if(e.code==='platform_model_cooldown')res.setHeader('Retry-After',String(e.retryAfter));if(!res.headersSent)json(res,status,{error:status===500?'Unexpected server error':e.message,...(e.code==='platform_model_cooldown'?{code:e.code,retryAfter:e.retryAfter}:{}),...(['image_upload_unsupported','image_quota_exhausted','markdown_too_large','storage_full','work_busy'].includes(e.code)?{code:e.code,...(e.limit?{limit:e.limit}:{})}:{})});else res.end()}finally{releaseWork?.()}
  });
  let timer;if(options.scheduler!==false){timer=setInterval(()=>lark.sync().catch(()=>{}),60000);timer.unref()}
- return {server,store,lark,importHostedDraft:(address,body)=>{if(!options.hosting?.canManage(address))fail(403,'Classroom owner required');const existing=store.get('SELECT id FROM courses WHERE id=?',body.id);if(existing)return existing;return createCourse(body,{admin:true,user_id:'hosting:'+address})},restoreBackup:{preview:restoreBackup.preview,apply:(...args)=>{storage.sync();return restoreBackup.apply(...args)}},hasHostingAccess:(req,res)=>managesHosting(session(req,res)),close:()=>new Promise(resolve=>{if(timer)clearInterval(timer);server.close(()=>{store.db.close();resolve()})})};
+ return {server,store,lark,importHostedDraft:(address,body)=>{if(!options.hosting?.canManage(address))fail(403,'Classroom owner required');const existing=store.get('SELECT id FROM courses WHERE id=?',body.id);if(existing)return existing;return createCourse(body,{admin:true,user_id:'hosting:'+address})},restoreBackup:{preview:restoreBackup.preview,apply:(...args)=>{storage.sync();return restoreBackup.apply(...args)}},hasHostingAccess:(req,res)=>managesHosting(session(req,res)),close:()=>new Promise(resolve=>{if(timer)clearInterval(timer);server.close(async()=>{await knowledgeWorker.close();store.db.close();resolve()})})};
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){const app=createApp();app.server.listen(Number(process.env.PORT||3140),process.env.HOST||'127.0.0.1',()=>console.log('CRM training listening on '+(process.env.HOST||'127.0.0.1')+':'+(process.env.PORT||3140)));for(const signal of ['SIGTERM','SIGINT'])process.once(signal,()=>app.close().then(()=>process.exit(0)))}
