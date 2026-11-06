@@ -8,10 +8,10 @@ export async function limitedJson(response){
 }
 export function diagnostics(store){
  store.db.exec('CREATE TABLE IF NOT EXISTS model_logs(id TEXT PRIMARY KEY,created TEXT NOT NULL,detail TEXT NOT NULL); CREATE INDEX IF NOT EXISTS model_log_time ON model_logs(created)');
- function record({project,model,status,data={},elapsedMs,kind,headers}){
+ function record({project,model,status,data={},elapsedMs,kind,headers,sourceCount,courseRevision}){
   const error=(Array.isArray(data)?data[0]?.error:data.error)||{},details=Array.isArray(error.details)?error.details:[];
   const quota=details.flatMap(d=>Array.isArray(d.violations)?d.violations:[]).slice(0,10).map(v=>({metric:identifier(v.quotaMetric),id:identifier(v.quotaId),limit:number(v.quotaValue)}));
-  const usage=data.usage||{},detail={project,model,httpStatus:status||null,kind:kind||(status===429?'quota_or_rate_limit':status===403?'permission_denied':status>=500?'provider_unavailable':status>=400?'request_rejected':'success'),providerStatus:identifier(error.status),explanation:/free tier is not available/i.test(error.message||'')?'free_tier_unavailable_billing_required':null,reasons:details.map(d=>identifier(d.reason)).filter(Boolean).slice(0,10),quota,retryAfter:identifier(headers?.get('retry-after'))||details.map(d=>identifier(d.retryDelay)).find(Boolean)||null,usage:{inputTokens:number(usage.prompt_tokens),outputTokens:number(usage.completion_tokens),totalTokens:number(usage.total_tokens)},remainingQuota:null,elapsedMs};
+  const usage=data.usage||{},detail={project,model,httpStatus:status||null,kind:kind||(status===429?'quota_or_rate_limit':status===403?'permission_denied':status>=500?'provider_unavailable':status>=400?'request_rejected':'success'),providerStatus:identifier(error.status),explanation:/free tier is not available/i.test(error.message||'')?'free_tier_unavailable_billing_required':null,reasons:details.map(d=>identifier(d.reason)).filter(Boolean).slice(0,10),quota,retryAfter:identifier(headers?.get('retry-after'))||details.map(d=>identifier(d.retryDelay)).find(Boolean)||null,usage:{inputTokens:number(usage.prompt_tokens),outputTokens:number(usage.completion_tokens),totalTokens:number(usage.total_tokens)},remainingQuota:null,elapsedMs,sourceCount:number(sourceCount),courseRevision:number(courseRevision)};
   // No free-form provider error, prompt, answer, URL, header or secret is persisted.
   store.run('INSERT INTO model_logs VALUES(?,?,?)',uid(),store.now(),JSON.stringify(detail));pruneLogs(store);return detail;
  }
