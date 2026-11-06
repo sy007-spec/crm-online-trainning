@@ -2,7 +2,7 @@
 // and operational metadata remain writable so a full classroom can still be read.
 export function contentStorage(store,hosting){
  if(!hosting)return {sync(){},describe:()=>null};
- const tables=['public_presentations','versions','business_materials','material_sources','image_attachments','notes','questions','ai_answers','annotations','discussion_context','question_edits','faq','faq_revisions','backup_restore_archives'];
+ const tables=['public_presentations','versions','business_materials','material_sources','image_attachments','notes','questions','ai_answers','preparation_documents','annotations','discussion_context','question_edits','faq','faq_revisions','backup_restore_archives'];
  store.db.exec('PRAGMA recursive_triggers=ON; CREATE TABLE IF NOT EXISTS content_storage(id INTEGER PRIMARY KEY CHECK(id=1),used INTEGER NOT NULL,cap INTEGER NOT NULL);');
  store.transaction(()=>{
  const fresh=!store.get('SELECT id FROM content_storage WHERE id=1');

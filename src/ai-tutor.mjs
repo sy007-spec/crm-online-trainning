@@ -40,7 +40,7 @@ export function aiTutor(store,{hosting,quota,fetcher=fetch}){
    }
    if(!valid())return save('stale');
    const controller=new AbortController();timer=setTimeout(()=>controller.abort(),45000);dispatched=true;
-   const response=await fetcher(connection.baseURL.replace(/\/$/,'')+'/chat/completions',{method:'POST',redirect:'error',signal:controller.signal,headers:{authorization:'Bearer '+connection.key,'content-type':'application/json'},body:JSON.stringify({model:connection.model,max_tokens:2200,response_format:{type:'json_object'},messages})});
+   const response=await fetcher(connection.baseURL.replace(/\/$/,'')+'/chat/completions',{method:'POST',redirect:'error',signal:controller.signal,headers:{authorization:'Bearer '+connection.key,'content-type':'application/json'},body:JSON.stringify({...(connection.extraBody||{}),model:connection.model,max_tokens:2200,response_format:{type:'json_object'},messages})});
    received=true;if(!global)health.record(response.status);if(!response.ok)throw Error('provider failed');
    const reader=response.body.getReader();let length=0,parts=[];for(;;){const {done,value}=await reader.read();if(done)break;length+=value.length;if(length>100000){await reader.cancel();throw Error('response too large')}parts.push(value)}
    const result=JSON.parse(Buffer.concat(parts).toString());if(global)quota.settle(reserved,result.usage?.total_tokens,period);
