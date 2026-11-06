@@ -1,11 +1,12 @@
+import {diagnostics} from './model-diagnostics.mjs';
 import {geminiPool} from './gemini-pool.mjs';
 import {fail,uid} from './security.mjs';
 export function modelConnections(store,{runtime,fetcher,hosting}={}){
- const pools=new Map();
+ const pools=new Map(),logs=diagnostics(store);
  const legacyGemini=()=>store.setting('geminiPool',{}),legacyCustom=()=>store.setting('customLLM',{});
  function index(){const saved=store.setting('modelConnections');if(saved)return saved;const profiles=[];if(legacyGemini().keys?.length)profiles.push({id:'legacy-gemini',name:'Gemini',enabled:!!legacyGemini().enabled});if(legacyCustom().key)profiles.push({id:'legacy-custom',name:'Custom model',enabled:true});return {revision:0,active:legacyGemini().enabled&&legacyGemini().keys?.length?'legacy-gemini':legacyCustom().key?'legacy-custom':null,profiles}}
  function pool(id){if(!pools.has(id)){let adapter=store,legacyPlain=false,configKey='modelConnection:'+id,healthKey=configKey+':health';if(id==='legacy-gemini'){configKey='geminiPool';healthKey='geminiPoolHealth'}if(id==='legacy-custom'){legacyPlain=true;adapter={...store,setting:(k,f)=>k===configKey?{enabled:true,provider:'compatible',baseURL:legacyCustom().baseURL,model:legacyCustom().model,cooldownHours:24,keys:[{id:'legacy',label:'Custom',project:'custom',secret:legacyCustom().key}]}:store.setting(k,f)}}pools.set(id,geminiPool(adapter,{runtime,fetcher,configKey,healthKey,allowCustom:true,hosting,legacyPlain}))}return pools.get(id)}
- function describe(){const i=index(),managed=!!store.setting('modelConnections'),active=i.profiles.find(p=>p.id===i.active&&p.enabled);return {revision:i.revision,active:i.active,managed,enabled:!!active&&(managed||active.id==='legacy-gemini'),configured:!!active,profiles:i.profiles.map(p=>({...p,...pool(p.id).describe(),enabled:p.enabled,active:p.id===i.active}))}}
+ function describe(){const i=index(),managed=!!store.setting('modelConnections'),active=i.profiles.find(p=>p.id===i.active&&p.enabled);return {logs:logs.list(),revision:i.revision,active:i.active,managed,enabled:!!active&&(managed||active.id==='legacy-gemini'),configured:!!active,profiles:i.profiles.map(p=>({...p,...pool(p.id).describe(),enabled:p.enabled,active:p.id===i.active}))}}
  function update(body){const i=index();if(body.revision!==i.revision)fail(409,'配置已更新，请重新打开 / Configuration changed; reload before saving');const selected=i.profiles.find(p=>p.id===body.id);if(body.action==='save'){
   if(!selected&&i.profiles.length>=20)fail(400,'Use up to 20 saved connections');const name=String(body.name||'').trim();if(!name||name.length>80)fail(400,'Connection name required');
   const before=selected?pool(selected.id).describe():null;if(selected?.enabled)fail(409,'请先停用再编辑，原配置仍保留 / Disable before editing; saved configuration is retained');
