@@ -90,5 +90,3 @@ Application audit, raw visits/reading events and model diagnostics are removed a
 Before every release: fetch the remote main branch, integrate it on main, test, push main, verify the deployed SHA equals remote main, then deploy with backup and rollback.
 
 Standalone process output is stored under runtime/logs in seven UTC daily files, capped at 2 MiB per day. Docker logging is disabled to prevent an unbounded duplicate. Direct API consumers/hosting wrappers must apply their own seven-day process-log policy.
-
-Hosted course Q&A prefers the platform model when the active subscription permits it, even if the classroom has its own connections. Platform errors or cooldown do not silently switch to a private key. Without platform-model entitlement, existing private-model selection remains available. This priority change never changes saved credentials and does not affect standalone installations or material conversion/translation.
