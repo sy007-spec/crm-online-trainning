@@ -196,3 +196,5 @@ dialog:has(.reading-share){width:min(560px,calc(100vw - 24px));overflow:auto}
 .ai-answer{margin:12px 0;padding:14px;border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:10px;background:var(--paper);white-space:normal}.ai-answer .text{white-space:pre-wrap;overflow-wrap:anywhere}.ai-source{display:inline-block;margin:4px 8px 8px 0}.ai-answer button{display:block;margin-top:8px}
 
 .preparation-editors{display:grid;grid-template-columns:1fr 1fr;gap:16px}.preparation-editors label{min-width:0}.preparation-editors textarea{width:100%;box-sizing:border-box;font-family:monospace}@media(max-width:700px){.preparation-editors{grid-template-columns:1fr}}
+
+.preparation-editors[hidden]{display:none}#prepReference textarea{width:100%;box-sizing:border-box;font-family:monospace}
