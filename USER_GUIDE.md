@@ -237,3 +237,10 @@
 讲师和学员的文字留言均保留原文。点击留言下的“译 English”或“译 中文”可使用课堂当前启用的模型补齐对应语言；译文保存后随界面语言切换，也可点击“原文”查看。译文标注为机器翻译，不代表讲师审核；原文编辑后旧译文自动失效。只有有权查看原讨论的用户才能请求或读取翻译，译文沿用讨论可见范围。无可用模型或翻译失败时，原文不变。
 
 Instructor and learner messages retain their original text. Use “译 English” or “译 中文” below a message to translate with the classroom’s enabled model. Saved translations follow the interface language; “Original” always restores the original text. Machine translations are labelled and are not instructor-reviewed. Editing the original invalidates its old translation. Only readers authorized for the discussion may request or read translations; failures never overwrite the original.
+
+
+### 修改提问与重新回答 / Edit and regenerate
+
+作者可以在自己的提问或回复下点击“编辑”，选择“保存修改”或“保存并重新生成回答”。系统保留已有回复、附件与修改记录，标记“作者已修改”，并使旧AI回答和译文失效；多人同时修改时要求刷新后再保存。问答、翻译与弹窗中的 Markdown 和 Mermaid 使用同一安全渲染方式，图形可全屏缩放拖动。
+
+Authors can edit their own questions or replies and choose “Save changes” or “Save & regenerate answer”. Existing replies, attachments and edit history are retained; edited messages are labelled and previous AI answers/translations become stale. Concurrent edits require a reload. Discussions, translations and dialogs render Markdown and Mermaid safely, with full-window zoom and pan for diagrams.
