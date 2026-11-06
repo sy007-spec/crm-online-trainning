@@ -83,3 +83,10 @@ Hosted content storage is 100 MB (Basic) / 500 MB (Advanced); sources, parsed co
 密钥采用 AES-256-GCM 加密后存入数据库；解密密钥为运行目录 course-ai.key，仅运行账户可读写。务必将运行数据库与该文件作为私有备份一起恢复，不提交到 Git。接口只返回配置状态，不回传 Key。本地知识向量模型需要持久缓存；默认容器内存上限为1GB，初次构建索引需要下载模型。
 
 参考：[Google latest 别名说明](https://developers.googleblog.com/continuing-to-bring-you-our-latest-models-with-an-improved-gemini-2-5-flash-and-flash-lite-release/)、[项目级限额](https://ai.google.dev/gemini-api/docs/rate-limits)。
+
+### Diagnostic log retention
+Application audit, raw visits/reading events and model diagnostics are removed after seven days (startup and once per minute). Course content, identities, approvals, discussions and notes are business records and are retained. Historical raw analytics beyond seven days will no longer be available. Model diagnostics show HTTP/provider status, structured quota violations/retry delay and reported token usage, never keys, prompts or answers. Remaining project quota is unknown unless provided by the provider; check Google AI Studio, not a guessed token balance. Operators must also configure seven-day retention for proxy/container logs and their log archives; database recovery snapshots are separate protected backups.
+
+Before every release: fetch the remote main branch, integrate it on main, test, push main, verify the deployed SHA equals remote main, then deploy with backup and rollback.
+
+Standalone process output is stored under runtime/logs in seven UTC daily files, capped at 2 MiB per day. Docker logging is disabled to prevent an unbounded duplicate. Direct API consumers/hosting wrappers must apply their own seven-day process-log policy.

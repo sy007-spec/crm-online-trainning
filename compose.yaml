@@ -19,7 +19,6 @@ services:
     security_opt: [no-new-privileges:true]
     mem_limit: 1024m
     logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+      # Standalone Node logs are bounded daily files in /data/logs, max 7 days.
+      # Avoid a second indefinite copy in Docker's size-only rotation.
+      driver: none

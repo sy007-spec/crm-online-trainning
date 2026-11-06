@@ -1,3 +1,5 @@
+import {runtimeLogs} from './runtime-logs.mjs';
+import {pruneLogs} from './log-retention.mjs';
 import {geminiPool} from './gemini-pool.mjs';
 import {knowledgeSync} from './knowledge-sync.mjs';
 import {courseKnowledge} from './course-knowledge.mjs';
@@ -248,7 +250,7 @@ export function createApp(options={}){
    fail(404,'Endpoint not found');
   }catch(e){if(e.message?.includes('classroom_storage_full'))Object.assign(e,{status:413,code:'storage_full',message:'Classroom storage limit reached'});const status=e.status||500;if(status>=500)console.error(JSON.stringify({event:'request.failed',path:p,status,error:e.message}));if(e.code==='platform_model_cooldown')res.setHeader('Retry-After',String(e.retryAfter));if(!res.headersSent)json(res,status,{error:status===500?'Unexpected server error':e.message,...(e.code==='platform_model_cooldown'?{code:e.code,retryAfter:e.retryAfter}:{}),...(['image_upload_unsupported','image_quota_exhausted','markdown_too_large','storage_full','work_busy'].includes(e.code)?{code:e.code,...(e.limit?{limit:e.limit}:{})}:{})});else res.end()}finally{releaseWork?.()}
  });
- let timer;if(options.scheduler!==false){timer=setInterval(()=>lark.sync().catch(()=>{}),60000);timer.unref()}
+ pruneLogs(store);let timer;if(options.scheduler!==false){timer=setInterval(()=>{pruneLogs(store);lark.sync().catch(()=>{})},60000);timer.unref()}
  return {server,store,lark,importHostedDraft:(address,body)=>{if(!options.hosting?.canManage(address))fail(403,'Classroom owner required');const existing=store.get('SELECT id FROM courses WHERE id=?',body.id);if(existing)return existing;return createCourse(body,{admin:true,user_id:'hosting:'+address})},restoreBackup:{preview:restoreBackup.preview,apply:(...args)=>{storage.sync();return restoreBackup.apply(...args)}},hasHostingAccess:(req,res)=>managesHosting(session(req,res)),close:()=>new Promise(resolve=>{if(timer)clearInterval(timer);server.close(async()=>{await knowledgeWorker.close();store.db.close();resolve()})})};
 }
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){const app=createApp();app.server.listen(Number(process.env.PORT||3140),process.env.HOST||'127.0.0.1',()=>console.log('CRM training listening on '+(process.env.HOST||'127.0.0.1')+':'+(process.env.PORT||3140)));for(const signal of ['SIGTERM','SIGINT'])process.once(signal,()=>app.close().then(()=>process.exit(0)))}
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){const logs=runtimeLogs(process.env.RUNTIME_DIR||path.join(root,'runtime'));for(const level of ['log','info','warn','error','debug'])console[level]=(...args)=>logs.write(level,...args);process.on('uncaughtExceptionMonitor',e=>logs.write('fatal',e.name,e.message));const logTimer=setInterval(()=>logs.prune(),60000);logTimer.unref();const app=createApp();app.server.listen(Number(process.env.PORT||3140),process.env.HOST||'127.0.0.1',()=>console.log('CRM training listening on '+(process.env.HOST||'127.0.0.1')+':'+(process.env.PORT||3140)));for(const signal of ['SIGTERM','SIGINT'])process.once(signal,()=>app.close().then(()=>process.exit(0)))}
