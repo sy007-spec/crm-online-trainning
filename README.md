@@ -29,6 +29,10 @@ Administrators configure course permissions, instructors, user security resets, 
 
 Shared reading links have bounded lifetimes and administrator approval controls. Reading analytics are engagement indicators, not proof of learning. Optional Lark integration and scoped agent APIs require configuration and authorization.
 
+The optional Feishu/Lark **classroom assistant** (课堂助手) turns a group chat into a classroom: discussions are cleaned, anonymised, kept within the course key description and saved daily as course sources, and the course draft is refreshed from them; nothing is published automatically. It is a paid add-on of the managed hosting service, which injects its private Feishu/Lark module (`createApp({larkAssist})`); self-hosted installations keep the free statistics and approval cards. See [LARK_CLASSROOM_SPEC.md](LARK_CLASSROOM_SPEC.md).
+
+Every course has a **key description** (课程关键说明): what it covers, for whom and what it excludes. It is shown to learners as the course introduction, keeps AI drafts within scope, and is refreshed by AI whenever a revision is uploaded (on by default; authors can edit it any time). See [COURSE_BRIEF_SPEC.md](COURSE_BRIEF_SPEC.md).
+
 ## Deployment and verification
 
 Set PUBLIC_URL to your HTTPS origin, RUNTIME_DIR to a private persistent directory, and PORT/HOST as needed. See [deployment](ops/README.md) for proxy, backup and container setup.

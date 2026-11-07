@@ -208,3 +208,7 @@ dialog:has(.reading-share){width:min(560px,calc(100vw - 24px));overflow:auto}
 .message-markdown{white-space:normal;overflow-wrap:anywhere;min-width:0}.message-markdown pre{white-space:pre-wrap;overflow:auto}.message-markdown p{margin:.5em 0}.message-markdown .lesson-diagram{max-width:100%;margin:12px 0}#editOwnText{min-height:160px}
 #quickDock.supplement-dock,#quickDock.supplement-dock #quickQuestion{background:#14735b;color:#fff}#quickDock.supplement-dock #quickQuestion{border-radius:12px;font-weight:600}
 #quickDock.supplement-dock:not(.collapsed){width:auto}#quickDock.supplement-dock:not(.collapsed) #quickQuestion{width:auto;flex:0 0 auto;padding:9px 12px}
+.lark-rooms{display:grid;gap:10px;margin:14px 0}
+.lark-room{display:grid;grid-template-columns:minmax(180px,1.3fr) minmax(170px,1fr) minmax(150px,auto) auto;gap:10px 16px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--paper)}
+.lark-room .lark-opts{display:flex;flex-wrap:wrap;gap:4px 14px}.lark-room .actions{margin:0;flex-wrap:wrap}.lark-room select{width:100%}
+@media (max-width:760px){.lark-room{grid-template-columns:1fr}}
