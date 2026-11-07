@@ -1,3 +1,4 @@
+import {larkGroupEdits} from './lark-group-edits.mjs';
 import {digest,uid,fail} from './security.mjs';
 
 const safe=s=>String(s||'').replace(/!\[([^\]]*)\]\([^)]*\)/g,'[图片：$1]').replaceAll('<','＜').replaceAll('>','＞');
@@ -11,7 +12,7 @@ export function larkGroupQa(store,{lark,enabled,course,answer,importQuestion,adm
  CREATE TABLE IF NOT EXISTS lark_group_qa_cards(batch_id TEXT NOT NULL,recipient TEXT NOT NULL,message_id TEXT,hash TEXT NOT NULL DEFAULT '',retry_at INTEGER NOT NULL DEFAULT 0,attempts INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(batch_id,recipient));`);
  let running=null,closed=false;
  const binding=chat=>store.get("SELECT * FROM lark_classrooms WHERE chat_id=? AND status='active' AND external=0",chat);
- const recipients=b=>{const r=binding(b.chat_id);return enabled()&&r&&r.cards&&r.course_id===b.course_id?[...new Set([r.owner_open_id,...admins()].filter(Boolean))]:[]};
+ const recipients=b=>{const r=binding(b.chat_id);return enabled()&&r&&r.cards&&r.course_id===b.course_id?[...new Set([...(r.members_synced&&now()-Date.parse(r.members_synced)<600000?[r.owner_open_id,...JSON.parse(r.manager_open_ids||'[]')]:[]),...admins()].filter(Boolean))]:[]};
  const member=r=>!!store.get("SELECT 1 FROM lark_classroom_members WHERE chat_id=? AND id_type='open_id' AND member_id=?",r.chat_id,r.sender);
  const live=r=>{const b=binding(r.chat_id);return enabled()&&b?.course_id===r.course_id&&member(r)&&!!store.get('SELECT 1 FROM lark_classroom_messages WHERE message_id=? AND chat_id=? AND course_id=? AND deleted=0',r.message_id,r.chat_id,r.course_id)};
  function context(id){try{return course(id)}catch{return null}}
@@ -29,14 +30,22 @@ export function larkGroupQa(store,{lark,enabled,course,answer,importQuestion,adm
   const c=context(b.course_id);if(!enabled()||binding(chat)?.course_id!==b.course_id||!c)return '课堂配置已变化，请稍后重试。';
   store.run('INSERT OR IGNORE INTO lark_group_qa(id,message_id,chat_id,course_id,sender,thread_id,question,context,created) VALUES(?,?,?,?,?,?,?,?,?)',uid(),ctx.message.messageId,chat,b.course_id,sender,ctx.message.threadId||null,question,JSON.stringify(c.stamp),now());kick();return null;
  }
- function render(b,detail=null){
+ const edits=larkGroupEdits(store,{lark,fresh,recipients,now});
+ function render(b,detail=null,draft=null){
   const all=items(b.id),selected=detail?all.filter(r=>r.id===detail):all;
   const button=(text,action,id)=>({tag:'button',text:{tag:'plain_text',content:text},behaviors:[{type:'callback',value:{action:'group_qa_'+action,batchId:b.id,revision:b.revision,...(id?{itemId:id}:{})}}]});
   const elements=[{tag:'markdown',content:'**群问答审核** · '+all.length+' 条\n确认后才补充到课程留言区；AI 回答需由管理员核实。来源变化的问答不能发布。'}];
-  for(const r of selected){const valid=r.state!=='cancelled'&&fresh(r);elements.push({tag:'markdown',content:valid?'**问题**\n'+safe(detail?r.question:short(r.question,220))+'\n\n**'+(r.answer_status==='answered'?'AI 回答':'暂未获得有依据的回答')+'**\n'+safe(detail?r.answer:short(r.answer,450))+'\n\n资料来源：'+JSON.parse(r.sources).length+' 处 · 状态：'+({pending:'待审核',imported:'已补充',ignored:'已忽略',withdrawn:'已撤回',cancelled:'已失效'}[r.decision]||r.decision):'此问答已撤回或课程资料已变化，不能补充。'});
+  for(const r of selected){const valid=r.state!=='cancelled'&&fresh(r);elements.push({tag:'markdown',content:valid?'**问题**\n'+safe(detail?r.question:short(r.question,220))+'\n\n**'+(r.answer_status==='manual'?'群管理员修订回复':r.answer_status==='answered'?'AI 回答':'暂未获得有依据的回答')+'**\n'+safe(detail?r.answer:short(r.answer,450))+'\n\n资料来源：'+JSON.parse(r.sources).length+' 处 · 状态：'+({pending:'待审核',imported:'已补充',ignored:'已忽略',withdrawn:'已撤回',cancelled:'已失效'}[r.decision]||r.decision):'此问答已撤回或课程资料已变化，不能补充。'});
    if(valid&&detail&&r.answer_status==='answered')elements.push({tag:'markdown',content:'**引用来源**\n'+JSON.parse(r.sources).map(s=>safe(short(sourceLabel(s),100))).join('\n')});
    if(valid&&r.decision==='pending')elements.push(button('补充此条','import',r.id),button('忽略此条','ignore',r.id));
-   if(valid&&!detail)elements.push(button('查看完整问答','detail',r.id));
+   if(valid&&detail&&['pending','imported','ignored'].includes(r.decision)){
+    elements.push({tag:'markdown',content:r.edit_revision?'管理员修订第 '+r.edit_revision+' 版 · '+(r.synced_revision===r.edit_revision?'群消息已同步':r.edit_error?'群消息更新失败，可重试；请检查飞书编辑时限、次数或权限。':'已保存，群消息等待更新'):'编辑不调用 AI；保存后标明管理员修订，不自动补充到课堂。'});
+    const value=draft??(['answered','manual'].includes(r.answer_status)?r.answer:'');
+    if(value.length<=4000){const chars=Array.from(value),submit=(name,text,action)=>({tag:'button',name,text:{tag:'plain_text',content:text},form_action_type:'submit',behaviors:[{type:'callback',value:{action:'group_qa_'+action,batchId:b.id,revision:b.revision,itemId:r.id}}]});elements.push({tag:'markdown',content:'**Markdown 预览（尚未保存）**\n'+safe(value||'（请填写人工回复）')},{tag:'form',name:'group_reply',elements:[...Array.from({length:4},(_,i)=>({tag:'input',name:'reply_'+i,input_type:'multiline_text',default_value:chars.slice(i*1000,(i+1)*1000).join(''),max_length:1000,width:'fill',placeholder:{tag:'plain_text',content:'回复第 '+(i+1)+' 段'}})),submit('preview','预览 Markdown','preview'),submit('save','保存并更新回复','edit')]});}
+    else elements.push({tag:'markdown',content:'回复超过 4000 字；请明确清空编辑后填写精简内容，原回复不会自动截断。'});
+    elements.push(button('清空编辑（不发布）','clear',r.id));if(r.edit_error)elements.push(button('重试更新群消息','retry_edit',r.id));
+   }
+   if(valid&&!detail)elements.push(button('查看 / 编辑回复','detail',r.id));
   }
   if(!detail)elements.push(button('补充全部待审核','import'),button('忽略全部待审核','ignore'));
   elements.push(button('刷新 / 返回列表','refresh'));
@@ -72,6 +81,7 @@ export function larkGroupQa(store,{lark,enabled,course,answer,importQuestion,adm
     if(fresh(ready))store.run("UPDATE lark_group_qa SET state='ready',reply_message_id=?,retry_at=0 WHERE id=? AND state='delivery'",sent.message_id||'',r.id);
    }catch{store.run('UPDATE lark_group_qa SET attempts=attempts+1,retry_at=? WHERE id=?',now()+Math.min(3600000,60000*2**Math.min(ready.attempts,6)),r.id);}
   }
+  await edits.flush();
   batches();
   for(const b of store.all('SELECT * FROM lark_group_qa_batches ORDER BY created')){
    for(const recipient of recipients(b))store.run('INSERT OR IGNORE INTO lark_group_qa_cards(batch_id,recipient) VALUES(?,?)',b.id,recipient);
@@ -86,17 +96,23 @@ export function larkGroupQa(store,{lark,enabled,course,answer,importQuestion,adm
  }
  const tick=()=>running||(running=flush().finally(()=>{running=null}));
  function kick(){if(!closed)queueMicrotask(()=>tick().catch(()=>{}));}
- function force(ctx){const b=binding(ctx.message.chatId);if(!b||!recipients(b).includes(ctx.sender.openId))return '只有本群群主或登记管理员可发起审核。';batches(b.chat_id);kick();return '已整理当前待审核问答，将通过私聊卡片通知管理员；正在生成的回答会在后续批次提交。';}
- function handle({eventId,actor,value,messageId}){
+ function force(ctx){const b=binding(ctx.message.chatId);if(!b||!recipients(b).includes(ctx.sender.openId))return '只有本群群主、群管理员或登记管理员可发起审核。';batches(b.chat_id);kick();return '已整理当前待审核问答，将通过私聊卡片通知管理员；正在生成的回答会在后续批次提交。';}
+ function handle({eventId,actor,value,formValue={},messageId}){
   const b=store.get('SELECT * FROM lark_group_qa_batches WHERE id=?',String(value.batchId||''));
   if(!b||!actor||!messageId||!recipients(b).includes(actor)||!context(b.course_id)||!store.get('SELECT 1 FROM lark_group_qa_cards WHERE batch_id=? AND recipient=? AND message_id=?',b.id,actor,messageId))fail(403,'无本群审核权限或卡片已失效');
   if(!eventId)fail(400,'Event ID required');if(store.get('SELECT id FROM callbacks WHERE id=?',eventId))return {toast:{type:'info',content:'已处理，请刷新卡片'}};
-  const action=String(value.action).replace('group_qa_','');if(!['refresh','detail','import','ignore'].includes(action))fail(400,'Unknown action');
+  const action=String(value.action).replace('group_qa_','');if(!['refresh','detail','import','ignore','preview','clear','edit','retry_edit'].includes(action))fail(400,'Unknown action');
   const all=items(b.id),selected=value.itemId?all.filter(r=>r.id===value.itemId):all;if(!selected.length)fail(400,'问答不属于此批次');
+  if(['preview','clear','edit','retry_edit'].includes(action)){
+   if(!value.itemId||selected.length!==1||value.revision!==b.revision)fail(409,'问答状态已变化，请刷新卡片');const r=selected[0];if(r.state!=='ready'||!fresh(r)||!['pending','imported','ignored'].includes(r.decision))fail(409,'问答或来源已失效，不能编辑');
+   const text=['preview','edit'].includes(action)?edits.read(formValue):'';
+   if(['preview','clear'].includes(action))return {toast:{type:'info',content:'仅预览，尚未发布'},card:{type:'raw',data:render(b,r.id,text)}};
+   store.transaction(()=>{if(action==='edit')edits.save(r,text,actor);else store.run("UPDATE lark_group_qa SET edit_attempts=0,edit_retry_at=0,edit_error='',edited_by=? WHERE id=?",actor,r.id);store.run('UPDATE lark_group_qa_batches SET revision=revision+1 WHERE id=?',b.id);store.run('INSERT INTO callbacks VALUES(?,?)',eventId,store.now());});kick();return {toast:{type:'success',content:action==='edit'?'已保存，群消息等待更新':'已安排重试，请稍后刷新'},card:{type:'raw',data:render(store.get('SELECT * FROM lark_group_qa_batches WHERE id=?',b.id),r.id)}};
+  }
   if(['import','ignore'].includes(action)){
    if(value.revision!==b.revision)fail(409,'问答状态已变化，请刷新卡片');
    const pending=selected.filter(r=>r.decision==='pending');if(pending.some(r=>!fresh(r)))fail(409,'消息或课程资料已变化，不能发布，请刷新');
-   store.transaction(()=>{for(const r of pending){const id=action==='import'?importQuestion(r,context(r.course_id),actor):null;store.run('UPDATE lark_group_qa SET decision=?,question_id=? WHERE id=?',action==='import'?'imported':'ignored',id,r.id);store.audit('lark:'+actor,'group_qa.'+action,{id:r.id,course:r.course_id,question:id});}store.run('UPDATE lark_group_qa_batches SET revision=revision+1 WHERE id=?',b.id);store.run('INSERT INTO callbacks VALUES(?,?)',eventId,store.now());});kick();
+   store.transaction(()=>{for(const r of pending){const id=action==='import'?importQuestion(r,context(r.course_id),actor):null;store.run('UPDATE lark_group_qa SET decision=?,question_id=? WHERE id=?',action==='import'?'imported':'ignored',id,r.id);if(action==='import'&&r.edit_revision>0)store.run('UPDATE lark_group_qa SET synced_revision=-1,edit_retry_at=0,edit_attempts=0 WHERE id=?',r.id);store.audit('lark:'+actor,'group_qa.'+action,{id:r.id,course:r.course_id,question:id});}store.run('UPDATE lark_group_qa_batches SET revision=revision+1 WHERE id=?',b.id);store.run('INSERT INTO callbacks VALUES(?,?)',eventId,store.now());});kick();
   }
   return {toast:{type:'success',content:action==='import'?'已补充到课程留言区':action==='ignore'?'已忽略':'已刷新'},card:{type:'raw',data:render(store.get('SELECT * FROM lark_group_qa_batches WHERE id=?',b.id),action==='detail'?value.itemId:null)}};
  }

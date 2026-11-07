@@ -29,7 +29,7 @@ export function larkClassroom(store,{lib,preparation,generateDraft,origin,brief=
  CREATE TABLE IF NOT EXISTS lark_classroom_sources(chat_id TEXT NOT NULL,ref TEXT NOT NULL,message_id TEXT NOT NULL,kind TEXT NOT NULL,name TEXT NOT NULL DEFAULT '',status TEXT NOT NULL,document_id TEXT,fingerprint TEXT,attempts INTEGER NOT NULL DEFAULT 0,error TEXT,created TEXT NOT NULL,updated TEXT NOT NULL,PRIMARY KEY(chat_id,ref));
  CREATE TABLE IF NOT EXISTS lark_classroom_digests(chat_id TEXT,day TEXT,document_id TEXT,kept INTEGER,input INTEGER,fingerprint TEXT,drafted INTEGER NOT NULL DEFAULT 0,updated TEXT,PRIMARY KEY(chat_id,day));`);
  const columns=table=>store.all(`PRAGMA table_info(${table})`).map(c=>c.name);
- for(const [name,type] of [['owner_open_id','TEXT'],['owner_name','TEXT'],['members_synced','TEXT'],['cards','INTEGER NOT NULL DEFAULT 1'],['prepare_state','TEXT'],['sources_dirty','INTEGER NOT NULL DEFAULT 0'],['history_scanned','TEXT']])if(!columns('lark_classrooms').includes(name))store.db.exec(`ALTER TABLE lark_classrooms ADD COLUMN ${name} ${type}`);
+ for(const [name,type] of [['manager_open_ids',"TEXT NOT NULL DEFAULT '[]'"],['owner_open_id','TEXT'],['owner_name','TEXT'],['members_synced','TEXT'],['cards','INTEGER NOT NULL DEFAULT 1'],['prepare_state','TEXT'],['sources_dirty','INTEGER NOT NULL DEFAULT 0'],['history_scanned','TEXT']])if(!columns('lark_classrooms').includes(name))store.db.exec(`ALTER TABLE lark_classrooms ADD COLUMN ${name} ${type}`);
  // Filled by the host's Feishu/Lark sign-in; lets members match across apps of the same tenant.
  if(!columns('users').includes('lark_union'))store.db.exec('ALTER TABLE users ADD COLUMN lark_union TEXT');
  const row=chat=>store.get('SELECT * FROM lark_classrooms WHERE chat_id=?',chat);
@@ -47,11 +47,11 @@ export function larkClassroom(store,{lib,preparation,generateDraft,origin,brief=
  const putMembers=(chat,users)=>{for(const u of users){putMember(chat,'open_id',u.openId,u.name);putMember(chat,'union_id',u.unionId,u.name)}};
  /** Reads the group owner and the full member list (open_id, plus union_id when the app may read it). */
  async function syncMembers(chat){
-  const client=larkClient(),info=await client.chatInfo(chat),open=await client.members(chat);
+  const client=larkClient(),raw=await client.api('im/v1/chats/'+encodeURIComponent(chat),{query:{user_id_type:'open_id'},code:'CHAT_INFO_FAILED'}),info={ownerOpenId:/^ou_/.test(String(raw.owner_id||''))?raw.owner_id:null,name:String(raw.name||''),managers:(Array.isArray(raw.user_manager_id_list)?raw.user_manager_id_list:[]).filter(x=>typeof x==='string'&&/^ou_[a-zA-Z0-9]+$/.test(x))},open=await client.members(chat);
   let union=null;try{union=await client.members(chat,{idType:'union_id'})}catch{/* union_id is optional */}
   const ownerName=open.find(m=>m.openId===info.ownerOpenId)?.name||'';
   store.transaction(()=>{
-   store.run('DELETE FROM lark_classroom_members WHERE chat_id=? AND id_type=?',chat,'open_id');putMembers(chat,open);
+   store.run('UPDATE lark_classrooms SET manager_open_ids=? WHERE chat_id=?',JSON.stringify(info.managers.filter(id=>open.some(m=>m.openId===id))),chat);store.run('DELETE FROM lark_classroom_members WHERE chat_id=? AND id_type=?',chat,'open_id');putMembers(chat,open);
    if(union){store.run('DELETE FROM lark_classroom_members WHERE chat_id=? AND id_type=?',chat,'union_id');putMembers(chat,union)}
    store.run("UPDATE lark_classrooms SET owner_open_id=?,owner_name=?,name=CASE WHEN ?<>'' THEN ? ELSE name END,members_synced=?,updated=? WHERE chat_id=?",info.ownerOpenId,ownerName,info.name,String(info.name).slice(0,200),store.now(),store.now(),chat);
   });
@@ -241,7 +241,7 @@ export function larkClassroom(store,{lib,preparation,generateDraft,origin,brief=
     for(const d of days)if(now()-d.last>QUIET_MS||dayStart(d.day)+DAY_MS<=now()){try{await distill(r.chat_id,d.day)}catch(e){store.run('UPDATE lark_classrooms SET last_error=? WHERE chat_id=?',String(e.message).slice(0,300),r.chat_id)}}
     if(store.get("SELECT 1 FROM lark_classroom_sources WHERE chat_id=? AND status='pending'",r.chat_id)){try{await ingest(r.chat_id,{limit:10})}catch{/* retried next tick */}}
     await draft(r.chat_id);
-    if(!r.members_synced||now()-Date.parse(r.members_synced)>DAY_MS){try{await syncMembers(r.chat_id)}catch(e){store.run('UPDATE lark_classrooms SET last_error=?,members_synced=? WHERE chat_id=?',String(e.code||e.message).slice(0,300),new Date(now()).toISOString(),r.chat_id)}}
+    if(!r.members_synced||now()-Date.parse(r.members_synced)>300000){try{await syncMembers(r.chat_id)}catch(e){store.run("UPDATE lark_classrooms SET last_error=?,manager_open_ids='[]' WHERE chat_id=?",String(e.code||e.message).slice(0,300),r.chat_id)}}
    }
   }finally{busy=false}
  }
