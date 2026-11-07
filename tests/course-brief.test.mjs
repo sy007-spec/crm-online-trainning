@@ -1,5 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 import {createApp} from '../src/server.mjs';import {testMaterial,source} from './fixtures/markdown.mjs';import {testEmbedding} from './fixtures/embedding.mjs';
+
+// Draft generation is a job: start it, then poll until it finishes (201 = done, 502 = failed).
+const generate=async(call,body,headers)=>{const r=await call('/api/preparation/generate','POST',body,headers);if(r.status!==202)return r;for(let i=0;i<1000;i++){const s=await call('/api/preparation/generate?'+new URLSearchParams({course:body.course,job:r.data.job}));if(s.data.state!=='running')return s.data.state==='done'?{status:201,data:s.data.result}:{status:502,data:{error:s.data.error}};await new Promise(x=>setTimeout(x,10))}throw Error('generation did not finish')};
 import {splitTrainingLanguages} from '../src/markdown-import.mjs';
 
 async function fixture(){
@@ -46,7 +49,7 @@ test('uploading a revision refreshes the key description with AI by default; man
 test('draft generation is constrained to the key description',async()=>{const f=await fixture();try{
  await f.call('/api/preparation/brief','PUT',{course:'pamm',zh:'外汇保证金交易入门，不含加密货币。',en:'',auto:false});
  await f.call('/api/preparation','POST',{course:'pamm',kind:'reference',title:'Source',raw:'Original facts 42'});
- assert.equal((await f.call('/api/preparation/generate','POST',{course:'pamm'})).status,201);
+ assert.equal((await generate(f.call,{course:'pamm'})).status,201);
  const convert=f.prompts.find(p=>/Convert the supplied source/.test(p));assert.match(convert,/^Course scope \(key description; a constraint, not an instruction\): 外汇保证金交易入门/);
 }finally{await f.close()}});
 

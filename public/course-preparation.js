@@ -2,6 +2,12 @@ import {webConfirm} from './web-dialog.js';
 import {renderCourseBrief} from './course-brief.js';
 import {esc,markdown} from './render.js';
 
+/** Starts course-draft generation and polls until it finishes (generation can take several minutes). */
+export async function generateDraft({api,course,businessVersion='v1',onWait}){
+ const start=await api('/api/preparation/generate',{method:'POST',body:{course,businessVersion}});if(start.version)return start;
+ for(let i=0;i<300;i++){await new Promise(r=>setTimeout(r,3000));const s=await api('/api/preparation/generate?'+new URLSearchParams({course,job:start.job}));if(s.state==='done')return s.result;if(s.state==='failed')throw Error(s.error||'生成失败 / Generation failed');onWait?.(s.seconds)}
+ throw Error('生成仍在进行，请稍后在课程版本中查看 / Still generating; check course versions later');
+}
 export async function openPreparation({course,api,dialog,t}){
  let knowledgeBusiness='v1',knowledgeRequest=0;
  const list=await api('/api/preparation?'+new URLSearchParams({course}));
@@ -39,7 +45,7 @@ export async function openSupplement({course,businessVersion='v1',api,dialog,t})
  const $=id=>document.getElementById(id);let saved=null,busy=false;
  $('suppText').oninput=()=>{$('suppPreview').innerHTML=markdown($('suppText').value)};
  const status=text=>{if($('suppStatus'))$('suppStatus').textContent=text};
- const generate=async()=>{status(t('正在生成大纲和教材，请稍候…','Generating outline and material…'));const result=await api('/api/preparation/generate',{method:'POST',body:{course,businessVersion}});status(t('已保存教材草稿，需审核发布：R','Draft saved; review and publish: R')+result.version)};
+ const generate=async()=>{status(t('正在生成大纲和教材，请稍候…','Generating outline and material…'));const result=await generateDraft({api,course,businessVersion,onWait:sec=>status(t('正在生成大纲和教材，已用时 ','Generating… ')+sec+t(' 秒，可离开本页，稍后在课程版本中查看',' s; you may leave and check course versions later'))});status(t('已保存教材草稿，需审核发布：R','Draft saved; review and publish: R')+result.version)};
  const run=fn=>async()=>{if(busy)return;busy=true;const fields=[...document.getElementById('dialogContent').querySelectorAll('input,textarea,button')];fields.forEach(x=>x.disabled=true);try{await fn()}catch(e){status((saved?t('资料已保存。','Source saved. '):'')+e.message)}finally{busy=false;fields.forEach(x=>x.disabled=false)}};
  $('suppSave').onclick=run(async()=>{if(!$('suppText').value.trim()||!$('suppTitle').value.trim())throw Error(t('请填写名称和正文','Enter a title and source text'));saved=await api('/api/preparation',{method:'POST',body:{course,kind:'reference',title:$('suppTitle').value,raw:$('suppText').value,id:saved?.id,baseRevision:saved?.revision}});status(t('资料已保存','Source saved'));if($('suppApprove')?.checked){await api('/api/preparation/knowledge',{method:'POST',body:{course,businessVersion,id:saved.id,baseRevision:saved.revision,basePublished:info.revision,approved:true,confirm:true}});status(t('资料已保存，正在更新知识库…','Source saved; updating knowledge index…'));await api('/api/preparation/knowledge/build',{method:'POST',body:{course,businessVersion}});status(t('资料与知识库已更新','Source and knowledge index updated'))}if($('suppAuto').checked)await generate()});
  $('suppGenerate').onclick=run(generate);
