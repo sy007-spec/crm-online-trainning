@@ -7,7 +7,7 @@ const libPath=process.env.LARK_FEISHU_ASSIST,lib=libPath&&fs.existsSync(libPath)
 const skip=lib?false:'set LARK_FEISHU_ASSIST to the private module';
 const enc='synthetic-encryption',verification='synthetic-verification';
 async function fixture(){
- const runtime=fs.mkdtempSync(path.join(os.tmpdir(),'group-qa-')),sent=[],requests=[],sdkState={};let sequence=0,mode='good',active=true,addon=true,failDelivery=false;
+ const runtime=fs.mkdtempSync(path.join(os.tmpdir(),'group-qa-')),sent=[],requests=[],sdkState={};let sequence=0,mode='good',active=true,addon=true,failDelivery=false,release;
  const sdk={Domain:{Feishu:'feishu',Lark:'lark'},LoggerLevel:{fatal:0},EventDispatcher:class{register(h){sdkState.handlers=h;return this}},WSClient:class{start(){}close(){}}};
  const options={runtime,seedMaterial:testMaterial(),scheduler:false,larkAssist:lib,larkSdk:sdk,larkAutoPrepare:false,embedding:testEmbedding,hosting:{status:()=>({active,tier:'advanced',limits:{globalModel:true},addons:{larkAssistant:addon}}),globalModel:async()=>({baseURL:'https://model.test/v1',model:'synthetic',key:'synthetic'})},larkFetch:async(url,init={})=>{
   const u=new URL(url),body=init.body?JSON.parse(init.body):{};
@@ -18,7 +18,7 @@ async function fixture(){
   throw Error('Unexpected synthetic Lark route '+u.pathname);
  },aiFetch:async(url,init)=>{
   const data=JSON.parse(init.body);if(data.messages[0].content.startsWith('Grounding reviewer'))return Response.json({choices:[{message:{content:'{"supported":true}'}}],usage:{total_tokens:3}});
-  const input=JSON.parse(data.messages[1].content);requests.push(input);assert(!init.body.includes('Synthetic instructor content'));if(mode==='fail')return Response.json({}, {status:503});
+  const input=JSON.parse(data.messages[1].content);requests.push(input);if(mode==='wait')await new Promise(r=>release=r);assert(!init.body.includes('Synthetic instructor content'));if(mode==='fail')return Response.json({}, {status:503});
   return Response.json({choices:[{message:{content:JSON.stringify({answer:{zh:'课程资料答案',en:'Supported synthetic course answer'},citations:[input.sources[0].id],insufficient:false})}}],usage:{total_tokens:20}});
  }};
  let app=createApp(options),s=app.store;s.set('lark',{enabled:true,appId:'cli_synthetic',appSecret:'synthetic',botOpenId:'ou_bot',region:'feishu',encryptKey:enc,verificationToken:verification,adminOpenIds:['ou_admin']});
@@ -32,7 +32,7 @@ async function fixture(){
  async function ask(id,extra){await app.classroom.handle(msg(id,extra));await settle();return s.get('SELECT * FROM lark_group_qa WHERE message_id=?',id);}
  async function batch(){app.groupQa.force({message:{chatId:'oc_group01'},sender:{openId:'ou_owner'}});await settle();return s.get('SELECT * FROM lark_group_qa_batches ORDER BY created DESC LIMIT 1');}
  function action(b,act='import',itemId,extra={}){return {eventId:'action_'+(++count),actor:'ou_owner',messageId:s.get('SELECT message_id FROM lark_group_qa_cards WHERE batch_id=? AND recipient=?',b.id,'ou_owner').message_id,value:{action:'group_qa_'+act,batchId:b.id,revision:b.revision,...(itemId?{itemId}:{})},...extra};}
- return {get app(){return app},get s(){return s},sent,requests,sdkState,event,deliver,msg,settle,ask,batch,action,reopen:async()=>{await app.close();app=createApp(options);s=app.store;await new Promise(r=>app.server.listen(0,'127.0.0.1',r));},mode:v=>mode=v,active:v=>active=v,addon:v=>addon=v,deliveryFail:v=>failDelivery=v,async close(){await app.close();fs.rmSync(runtime,{recursive:true,force:true})}};
+ return {get app(){return app},get s(){return s},sent,requests,sdkState,event,deliver,msg,settle,ask,batch,action,release:()=>release?.(),reopen:async()=>{await app.close();app=createApp(options);s=app.store;await new Promise(r=>app.server.listen(0,'127.0.0.1',r));},mode:v=>mode=v,active:v=>active=v,addon:v=>addon=v,deliveryFail:v=>failDelivery=v,async close(){await app.close();fs.rmSync(runtime,{recursive:true,force:true})}};
 }
 
 test('group answer uses grounded tutor without public questions; owner approves exact-once and recall withdraws it',{skip},async()=>{const f=await fixture();try{
@@ -79,3 +79,5 @@ test('ten-minute batching, member/entitlement/source checks and expired leases f
  f.s.run('UPDATE lark_group_qa SET context=? WHERE id=?','["v1",999,"changed"]',r.id);assert.throws(()=>f.app.groupQa.handle(f.action(b,'import',r.id)),/资料已变化/);assert.equal(f.s.get('SELECT COUNT(*) n FROM questions').n,0);
  f.s.run('UPDATE lark_group_qa SET context=? WHERE id=?',r.context,r.id);f.app.groupQa.handle(f.action(b,'import',r.id));const replies=f.s.all('SELECT body FROM questions WHERE teacher=1 ORDER BY rowid');assert(replies.length>1);assert(replies.map(x=>x.body).join('').includes(text));assert(replies.every(x=>x.body.length<=4000));
  }finally{await f.close()}});
+
+ test('graceful shutdown preserves a valid in-flight group answer',{skip},async()=>{const f=await fixture();try{f.mode('wait');await f.app.classroom.handle(f.msg('om_shutdown'));for(let n=0;n<100&&!f.requests.length;n++)await new Promise(r=>setTimeout(r,10));assert.equal(f.requests.length,1);const closing=f.app.groupQa.close();f.release();await closing;assert.equal(f.s.get('SELECT state FROM lark_group_qa').state,'ready');assert.equal(f.s.get('SELECT answer_status FROM lark_group_qa').answer_status,'answered');}finally{await f.close()}});

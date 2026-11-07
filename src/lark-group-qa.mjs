@@ -58,7 +58,7 @@ export function larkGroupQa(store,{lark,enabled,course,answer,importQuestion,adm
    if(!fresh(r)){invalidate(r);continue;}
    if(r.state!=='delivery'){
     store.run("UPDATE lark_group_qa SET state='answering',retry_at=?,attempts=attempts+1 WHERE id=?",now()+300000,r.id);
-    let result;try{result=await answer(r,()=>fresh(r)&&!closed)}catch{result={status:'failed'}}
+    let result;try{result=await answer(r,()=>fresh(r))}catch{result={status:'failed'}}
     if(!fresh(r)||result.status==='stale'){invalidate(r);continue;}
     if(['busy','limited','failed'].includes(result.status)&&r.attempts<2){store.run("UPDATE lark_group_qa SET state='queued',retry_at=? WHERE id=?",now()+60000,r.id);continue;}
     const body=result.status==='answered'?result.body:result.status==='insufficient'?result.body:'AI 暂不可用，尚未生成回答。问题会提交管理员审核，可由讲师补充解答。';
