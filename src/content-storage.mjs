@@ -2,13 +2,13 @@
 // and operational metadata remain writable so a full classroom can still be read.
 export function contentStorage(store,hosting){
  if(!hosting)return {sync(){},describe:()=>null};
- const tables=['public_presentations','versions','business_materials','material_sources','image_attachments','notes','questions','ai_answers','knowledge_chunks','knowledge_approvals','knowledge_indexes','preparation_documents','annotations','discussion_context','discussion_translations','question_edits','faq','faq_revisions','backup_restore_archives'];
+ const tables=['public_presentations','versions','business_materials','material_sources','image_attachments','notes','questions','ai_answers','knowledge_chunks','knowledge_approvals','knowledge_indexes','preparation_documents','materials_documents','materials_revisions','materials_assets','materials_jobs','materials_packs','annotations','discussion_context','discussion_translations','question_edits','faq','faq_revisions','backup_restore_archives'];
  store.db.exec('PRAGMA recursive_triggers=ON; CREATE TABLE IF NOT EXISTS content_storage(id INTEGER PRIMARY KEY CHECK(id=1),used INTEGER NOT NULL,cap INTEGER NOT NULL);');
  store.transaction(()=>{
  const fresh=!store.get('SELECT id FROM content_storage WHERE id=1');
  if(fresh)store.run('INSERT INTO content_storage VALUES(1,0,0)');
  store.run('UPDATE content_storage SET used=0 WHERE id=1');
- for(const table of tables){const columns=store.all('PRAGMA table_info('+table+')').map(c=>c.name);if(!columns.length)continue;
+ for(const table of tables){if(store.get("SELECT type FROM sqlite_master WHERE name=?",table)?.type!=='table'){for(const event of ['INSERT','UPDATE','DELETE'])store.db.exec('DROP TRIGGER IF EXISTS storage_'+table+'_'+event);continue}const columns=store.all('PRAGMA table_info('+table+')').map(c=>c.name);if(!columns.length)continue;
  const bytes=prefix=>columns.map(c=>'COALESCE(length(CAST('+prefix+'"'+c+'" AS BLOB)),0)').join('+');
  store.run('UPDATE content_storage SET used=used+(SELECT COALESCE(SUM('+bytes('')+'),0) FROM '+table+') WHERE id=1');
  for(const event of ['INSERT','UPDATE','DELETE'])store.db.exec('DROP TRIGGER IF EXISTS storage_'+table+'_'+event);
