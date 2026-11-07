@@ -101,3 +101,7 @@ The administrator **AI model connections** page manages course Q&A connections: 
 Course Q&A accepts up to 12 exact source citations, attaches exact original excerpts on the server for every citation and separately verifies factual grounding against those excerpts. Model-generated quote strings are never used as evidence. One bounded regeneration repairs JSON/citation contract failures; it never bypasses grounding. Generation and repair have 4096 output tokens and share a 90-second deadline with verification. Seven-day diagnostics identify generation, format repair and verification failures without storing question/source/answer text.
 
 Knowledge-source diagnostics include published revision and retrieved-source count. Model refusal, no retrieved sources and grounding rejection are distinct outcomes; grounding rejection is shown as an unverified answer, never as proof that the course is missing content. Existing published course indexing and revision invalidation remain unchanged.
+
+### 群内答疑与留言审核
+
+启用课堂助手并关联课程后，在飞书/Lark 群中 @机器人即可根据已发布课程及获准资料答疑。每 5 条问答或首条等待 10 分钟后，私聊卡片通知本群群主及登记管理员；卡片支持查看完整问答、逐条/整批补充到课程留言区、忽略和刷新。群主可 @机器人发送“问答审核”立即汇总。未经确认不会公开到课堂；无 AI 时可只补充待答问题。后台显示处理中、待审核、已补充数量。详见 [群问答实现规格](LARK_GROUP_QA_SPEC.md)。独立部署需由集成启动器注入同一助手模块，并配置本校自己的飞书应用。

@@ -17,7 +17,7 @@ const DAY_MS=86400000,QUIET_MS=10*60000,DRAFT_INTERVAL_MS=6*3600000,TEXT_MAX=800
 const shanghaiDay=ms=>new Date(ms+8*3600000).toISOString().slice(0,10);
 const dayStart=day=>Date.parse(day+'T00:00:00+08:00');
 
-export function larkClassroom(store,{lib,preparation,generateDraft,origin,brief=()=>'',fetch,now=Date.now,sdk=null,manualAdmins=()=>[],onCardAction,extract=null,vision=null,autoPrepare=false,historyDays=180}){
+export function larkClassroom(store,{lib,preparation,generateDraft,origin,brief=()=>'',fetch,now=Date.now,sdk=null,manualAdmins=()=>[],onCardAction,onQuestion,onQuestionReview,onRemoved,extract=null,vision=null,autoPrepare=false,historyDays=180}){
  const {createAssistant,cleanDiscussion,discussionMarkdown,cards}=lib;
  let clientValue=null,clientKey='';
  const larkClient=()=>{const c=larkSettings(store);if(!c.appId||!c.appSecret)throw Error('Lark app credentials missing');const key=[larkDomain(c),c.appId,c.appSecret].join('\u0000');if(!clientValue||clientKey!==key){clientValue=lib.createLarkClient({domain:larkDomain(c),appId:c.appId,appSecret:c.appSecret,fetch});clientKey=key}return clientValue};
@@ -180,20 +180,21 @@ export function larkClassroom(store,{lib,preparation,generateDraft,origin,brief=
    resolveChat:async m=>{const r=active(m.chatId);if(!r){discover(m.chatId);return null}return {projectId:r.course_id,name:r.name,brief:brief(r.course_id),collect:!!r.collect,external:!!r.external,externalAllowed:false}},
    knowledge:{save:async item=>{record(item,item.projectId);queueMaterials(item.chatId,item)}},
    commands:[
+    {names:['问答审核','review'],description:'提交群问答审核（本群管理员）',scope:'group',run:async ctx=>onQuestionReview?.(ctx)||'问答审核暂不可用'},
     {names:['课堂','统计','stats','class'],description:'本课堂概况 / Classroom status',scope:'group',run:async ctx=>({card:statusCard(active(ctx.message.chatId))})},
     {names:['整理','digest'],description:'立即整理今天的讨论（管理员）/ Digest today now (admins)',scope:'group',run:async ctx=>{if(!admins().has(ctx.sender.openId))return '只有群主或后台登记的管理员可以触发整理。Only the group owner or registered administrators can trigger a digest.';const r=await distill(ctx.message.chatId,dayKey());return r.state==='saved'?`已整理 ${r.kept}/${r.input} 条讨论，保存为课程资料“${r.title}”。`:r.state==='unchanged'?'今天的讨论没有新内容。Nothing new today.':'今天还没有可整理的讨论。No discussion to digest yet.'}},
     {names:['备课','prepare'],description:'整理群里全部历史讨论和文档并生成课程草稿（群主）/ Prepare the course from this group (owner)',scope:'group',run:async ctx=>{if(!admins().has(ctx.sender.openId))return '只有群主或后台登记的管理员可以发起备课。Only the group owner or registered administrators can start.';const x=startPrepare(ctx.message.chatId,{notify:true});return x.state==='running'?'正在备课中，完成后会在群里告诉大家。Already running.':'开始备课：补抓群历史讨论、读取群里的文档与附件、整理并生成课程草稿，完成后在群里回报。Started.'}},
    ],
    // A question to the bot is part of the class discussion: keep it for the digest and tell the asker where it goes.
-   answer:async(question,ctx)=>{if(ctx.scope!=='group'||!ctx.chat)return '请在已关联课程的课堂群里 @我 提问，或发送“帮助”。Ask in a classroom group, or send "help".';record({...ctx.message,text:question},ctx.chat.projectId,{question:true});return '已记录到课堂讨论，讲师整理课程时会参考。Recorded for the instructor.'},
-   onBotAdded:async e=>{discover(e.chatId,e.chatName,e.external);try{await client.sendText({type:'chat_id',id:e.chatId},'我是 TeachInPublic 课堂助手。管理员在后台“飞书课堂助手”中把本群关联到课程后：群主成为课堂管理员，群成员自动加入课程名单（用飞书登录即可访问课程），群内讨论每天整理进课程资料并更新草稿（发布需讲师审核）。@我 发送“帮助”查看命令。',`welcome:${e.chatId}`.slice(0,50))}catch{/* welcome is best effort */}},
+   answer:async(question,ctx)=>{if(ctx.scope!=='group'||!ctx.chat)return '请在已关联课程的课堂群里 @我 提问，或发送“帮助”。Ask in a classroom group, or send "help".';record({...ctx.message,time:ctx.message.createTime,text:question},ctx.chat.projectId,{question:true});return onQuestion?onQuestion(question,ctx):'群答疑暂不可用，请联系讲师。'},
+   onBotAdded:async e=>{discover(e.chatId,e.chatName,e.external);try{await client.sendText({type:'chat_id',id:e.chatId},'我是 TeachInPublic 课堂助手。管理员在后台“飞书课堂助手”中把本群关联到课程后：群主成为课堂管理员，群成员自动加入课程名单（用飞书登录即可访问课程），群内讨论每天整理进课程资料并更新草稿（发布需讲师审核）。@我 可依据已发布课程答疑；问答批量提交管理员卡片审核，确认后才补充到课程留言。群主可发送“问答审核”立即整理。@我 发送“帮助”查看命令。',`welcome:${e.chatId}`.slice(0,50))}catch{/* welcome is best effort */}},
    onEvent:async n=>{
     const change=lib.normalizeMemberEvent?.(n);
     if(change){if(!row(change.chatId))return;if(change.kind==='added')putMembers(change.chatId,change.users);else for(const u of change.users)store.run('DELETE FROM lark_classroom_members WHERE chat_id=? AND member_id IN (?,?)',change.chatId,u.openId||'',u.unionId||'');return}
     if(n.eventType==='im.chat.updated_v1'){const chat=String(n.event?.chat_id||'');if(active(chat))await syncMembers(chat)}
    },
    ...(onCardAction?{onCardAction:a=>onCardAction({...a,admins:admins()})}:{}),
-   onRemoved:async ref=>{if(ref.kind==='message')store.run('UPDATE lark_classroom_messages SET deleted=1 WHERE message_id=?',ref.messageId);else store.run("UPDATE lark_classrooms SET status='removed',updated=? WHERE chat_id=?",store.now(),ref.chatId)},
+   onRemoved:async ref=>{if(ref.kind==='message')store.run('UPDATE lark_classroom_messages SET deleted=1 WHERE message_id=?',ref.messageId);else store.run("UPDATE lark_classrooms SET status='removed',updated=? WHERE chat_id=?",store.now(),ref.chatId);onRemoved?.(ref)},
    onError:e=>store.set('larkClassroomLastError',{code:e.code||e.message,at:store.now()}),
   });
   return assistantValue;

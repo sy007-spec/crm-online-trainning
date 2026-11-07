@@ -89,7 +89,7 @@ test('classroom group discussion becomes a cleaned course source and an unpublis
  await f.say('无关群的消息',{chat:'oc_other99'});
  await f.until(()=>f.lark.sent.length>=2&&f.store.get("SELECT deleted FROM lark_classroom_messages WHERE message_id='om_recall'")?.deleted===1&&f.store.get("SELECT 1 FROM lark_classrooms WHERE chat_id='oc_other99'"),'events processed');
  assert.ok(f.lark.sent.every(s=>s.origin==='https://open.larksuite.com'),'region honoured');
- const reply=f.lark.sent.find(s=>s.path.endsWith('/reply')&&s.body.msg_type==='text');assert.match(JSON.parse(reply.body.content).text,/已记录到课堂讨论/);
+ const reply=f.lark.sent.find(s=>s.path.endsWith('/reply')&&s.body.msg_type==='text');assert.match(JSON.parse(reply.body.content).text,/本群尚无可用的已发布课程/);
  const card=f.lark.sent.find(s=>s.path==='/open-apis/im/v1/messages/om_cmd/reply');assert.equal(card.body.msg_type,'interactive');
  assert.equal(f.store.get("SELECT status FROM lark_classrooms WHERE chat_id='oc_other99'").status,'pending','unbound chats are listed for binding, not collected');
  assert.equal(f.store.get("SELECT COUNT(*) n FROM lark_classroom_messages WHERE chat_id='oc_other99'").n,0);
