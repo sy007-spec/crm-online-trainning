@@ -22,6 +22,16 @@ function fakeLark(){
   if(p==='/open-apis/bot/v3/info')return Response.json({code:0,bot:{open_id:'ou_bot',app_name:'课堂助手'}});
   if(p==='/open-apis/tenant/v2/tenant/query')return Response.json({code:0,data:{tenant:{tenant_key:'tk',name:'Org'}}});
   if(p==='/open-apis/im/v1/chats')return Response.json({code:0,data:{items:[{chat_id:'oc_class01',name:'外汇入门 1 班',external:false},{chat_id:'oc_extern1',name:'外部群',external:true}],has_more:false}});
+  // Group history: discussion, a cloud document, a wiki page, an attachment, an unshared document and a spreadsheet.
+  if((init.method||'GET')==='GET'&&p==='/open-apis/im/v1/messages'){const t=String(Date.now()-3600000),msg=(id,type,content,from='ou_m1')=>({message_id:id,msg_type:type,create_time:t,sender:{id:from,id_type:'open_id',sender_type:'user'},body:{content:JSON.stringify(content)}});
+   return Response.json({code:0,data:{has_more:false,items:[msg('om_h1','text',{text:'止损单要设在关键支撑位下方'}),msg('om_h2','text',{text:'课程大纲在这里 https://example.feishu.cn/docx/DocOutline001'}),msg('om_h3','file',{file_key:'file_v3_handout',file_name:'讲义.md'}),msg('om_h4','text',{text:'参考 https://example.feishu.cn/wiki/WikiRisk00001 和 https://example.feishu.cn/docx/DocPrivate01'}),msg('om_h5','text',{text:'成绩表 https://example.feishu.cn/sheets/SheetScore01'}),msg('om_h6','text',{text:'机器人消息'},'ou_bot')]}})}
+  if(p==='/open-apis/docx/v1/documents/DocOutline001')return Response.json({code:0,data:{document:{title:'课程大纲',revision_id:3}}});
+  if(p==='/open-apis/docx/v1/documents/DocOutline001/raw_content')return Response.json({code:0,data:{content:'第一课 止损单\n第二课 限价单\n第三课 杠杆与保证金'}});
+  if(p==='/open-apis/wiki/v2/spaces/get_node')return Response.json({code:0,data:{node:{obj_type:'docx',obj_token:'DocRiskWiki1',title:'风险提示'}}});
+  if(p==='/open-apis/docx/v1/documents/DocRiskWiki1')return Response.json({code:0,data:{document:{title:'风险提示'}}});
+  if(p==='/open-apis/docx/v1/documents/DocRiskWiki1/raw_content')return Response.json({code:0,data:{content:'强平风险：保证金低于维持比例时会被强制平仓。'}});
+  if(p.startsWith('/open-apis/docx/v1/documents/DocPrivate01'))return Response.json({code:1770032,msg:'forbidden'},{status:403});
+  if(p==='/open-apis/im/v1/messages/om_h3/resources/file_v3_handout')return new Response('# 讲义\n\n限价单在指定价格或更优价格成交。',{headers:{'content-type':'application/octet-stream'}});
   if(init.method==='POST'&&p.startsWith('/open-apis/im/v1/messages')){sent.push({path:p,origin:u.origin,body});return Response.json({code:0,data:{message_id:'om_sent'+sent.length}})}
   return Response.json({code:404,msg:'unexpected '+p},{status:404});
  };
@@ -146,4 +156,34 @@ test('only App ID and App Secret: platform detected, long connection, owner is t
  assert.equal(f.app.classroom.allows('pamm',{lark_id:'ou_m2'}),false);assert.deepEqual(f.app.classroom.owners(),[]);
  // Changed credentials reopen the connection; turning the add-on off is handled by the scheduler.
  f.app.classroom.disconnect();assert.equal(ws.state.closed,true);
+}finally{await f.close()}});
+
+test('一键备课: group history, shared documents and attachments become course sources and a draft',{skip},async()=>{const ws=fakeSdk(),f=await fixture({sdk:ws.sdk});try{
+ assert.equal((await f.call('/api/admin/lark','PUT',{appId:'cli_feishu_app',appSecret:['s','e','c'].join('')})).status,200);
+ f.app.classroom.connect();let e=0;const push=(type,body)=>ws.state.handlers[type]({event_id:'ws-'+(++e),...body});
+ assert.equal((await f.call('/api/admin/lark/classrooms/prepare','POST',{chatId:'oc_class01'})).status,409,'only linked groups');
+ await f.call('/api/admin/lark/classrooms','PUT',{chatId:'oc_class01',courseId:'pamm'});
+ const before=f.store.get("SELECT draft FROM courses WHERE id='pamm'").draft;
+ assert.equal((await f.call('/api/admin/lark/classrooms/prepare','POST',{chatId:'oc_class01'})).status,202);
+ const state=()=>JSON.parse(f.store.get("SELECT prepare_state FROM lark_classrooms WHERE chat_id='oc_class01'").prepare_state||'{}');
+ for(let i=0;i<500&&state().state==='running';i++)await new Promise(r=>setTimeout(r,20));
+ const p=state();assert.equal(p.state,'done',JSON.stringify(p));
+ assert.equal(p.messages,5,'bot messages are left out');assert.equal(p.documents,3);assert.equal(p.documentsFailed,1);assert.equal(p.documentsSkipped,1);assert.equal(p.draft,'drafted');
+ const docs=f.store.all("SELECT title,raw FROM preparation_documents WHERE course_id='pamm' AND kind='reference'");
+ const by=t=>docs.find(d=>d.title===t)?.raw||'';
+ assert.match(by('飞书资料 · 课程大纲'),/第三课 杠杆与保证金/);assert.match(by('飞书资料 · 风险提示'),/强制平仓/);assert.match(by('飞书资料 · 讲义.md'),/限价单在指定价格/);
+ assert.ok(docs.some(d=>/止损单要设在关键支撑位/.test(d.raw)),'history discussion is digested');
+ assert.ok(f.store.get("SELECT draft FROM courses WHERE id='pamm'").draft>before,'a course draft was generated');
+ const sources=(await f.call('/api/admin/lark/classrooms/sources?chatId=oc_class01')).data.sources;
+ assert.match(sources.find(x=>x.ref==='doc:docx:DocPrivate01').error,/分享/);assert.equal(sources.find(x=>x.ref==='doc:sheets:SheetScore01').status,'skipped');
+ // Running again re-reads documents but does not duplicate sources.
+ const count=docs.length;await f.app.classroom.prepare('oc_class01');assert.equal(f.store.get("SELECT COUNT(*) n FROM preparation_documents WHERE course_id='pamm' AND kind='reference'").n,count);
+ // A document shared later is queued live and read by the scheduler's ingest step.
+ await push('im.message.receive_v1',{sender:{sender_id:{open_id:'ou_m2'},sender_type:'user'},message:{message_id:'om_live1',chat_id:'oc_class01',chat_type:'group',message_type:'text',create_time:String(Date.now()),content:JSON.stringify({text:'补充 https://example.feishu.cn/wiki/WikiRisk00001'})}});
+ await push('im.message.receive_v1',{sender:{sender_id:{open_id:'ou_m2'},sender_type:'user'},message:{message_id:'om_live2',chat_id:'oc_class01',chat_type:'group',message_type:'file',create_time:String(Date.now()),content:JSON.stringify({file_key:'file_v3_handout',file_name:'讲义.md'})}});
+ assert.equal(f.store.get("SELECT COUNT(*) n FROM lark_classroom_sources WHERE chat_id='oc_class01'").n,5,'already known materials are not queued twice');
+ // Only the owner may start it from the group.
+ await push('im.message.receive_v1',{sender:{sender_id:{open_id:'ou_m2'},sender_type:'user'},message:{message_id:'om_cmd2',chat_id:'oc_class01',chat_type:'group',message_type:'text',create_time:String(Date.now()),content:JSON.stringify({text:'@_user_1 备课'}),mentions:[{key:'@_user_1',id:{open_id:'ou_bot'},name:'课堂助手'}]}});
+ await f.until(()=>f.lark.sent.some(x=>x.path==='/open-apis/im/v1/messages/om_cmd2/reply'),'reply');
+ assert.match(JSON.parse(f.lark.sent.find(x=>x.path==='/open-apis/im/v1/messages/om_cmd2/reply').body.content).text,/只有群主/);
 }finally{await f.close()}});

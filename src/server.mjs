@@ -37,6 +37,7 @@ import {uid,token,digest,passwordHash,passwordValid,normalizeCode,clientIp,valid
 import {statistics} from './stats.mjs';
 import {LarkService,larkSettings,verifyCallback,buildCard,larkDomain,detectRegion} from './lark.mjs';
 import {larkClassroom} from './lark-classroom.mjs';
+import {extractDocument} from './document-extract.mjs';
 import {courseBriefs} from './course-brief.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
 export function createApp(options={}){
@@ -84,7 +85,7 @@ export function createApp(options={}){
  const larkAssist=options.larkAssist||null;
  const assistantEnabled=()=>{if(!larkAssist)return false;if(!options.hosting)return true;const st=options.hosting.status();return !!st.active&&st.addons?.larkAssistant===true};
  const requireAssistant=()=>{if(!classroom||!assistantEnabled())fail(403,'飞书课堂助手未开通，请联系托管平台开通 / The Lark classroom assistant is not enabled for this classroom')};
- const classroom=larkAssist?larkClassroom(store,{lib:larkAssist,sdk:options.larkSdk||null,manualAdmins:()=>larkSettings(store).adminOpenIds||[],onCardAction:a=>{try{return cardAction({eventId:a.eventId,actor:a.operator?.openId,value:a.value,option:a.option||'',selectedDate:a.selectedDate})}catch(e){return {toast:{type:'error',content:String(e.message).slice(0,100)}}}},preparation,origin,fetch:options.larkFetch,brief:id=>briefs.text(id),generateDraft:(courseId,o)=>generateCourseDraft(courseId,classroomSession,{...o,allowed:()=>!options.hosting||options.hosting.status().active})}):null;
+ const classroom=larkAssist?larkClassroom(store,{lib:larkAssist,sdk:options.larkSdk||null,extract:extractDocument,autoPrepare:options.larkAutoPrepare??options.scheduler!==false,manualAdmins:()=>larkSettings(store).adminOpenIds||[],onCardAction:a=>{try{return cardAction({eventId:a.eventId,actor:a.operator?.openId,value:a.value,option:a.option||'',selectedDate:a.selectedDate})}catch(e){return {toast:{type:'error',content:String(e.message).slice(0,100)}}}},preparation,origin,fetch:options.larkFetch,brief:id=>briefs.text(id),generateDraft:(courseId,o)=>generateCourseDraft(courseId,classroomSession,{...o,allowed:()=>!options.hosting||options.hosting.status().active})}):null;
  const larkSetup=platform=>{const c=larkSettings(store),p=platform||larkDomain(c);const m=larkAssist.buildSetupManifest({platform:p,preset:'classroom',delivery:options.larkSdk?'long_connection':'webhook',appId:c.appId||undefined,eventUrl:origin+'/api/lark/callback',product:'TeachInPublic',appDescription:'把飞书群作为培训课堂：按课程关键说明整理群内讨论、补充课程资料，推送学习统计与访问审批卡片。',credentialsPage:'下方“应用凭证”'});return {...m,credentialsDone:!!(c.botOpenId&&c.appId&&p===larkDomain(c))}};
  // Daily cards also go to the owners of linked classroom groups; the long connection opens once credentials exist.
  lark.extraRecipients=()=>classroom&&assistantEnabled()?classroom.owners({cardsOnly:true}):[];
@@ -277,6 +278,8 @@ export function createApp(options={}){
     if(p==='/api/admin/lark/setup'&&req.method==='GET'){requireAssistant();return json(res,200,larkSetup(['feishu','lark'].includes(url.searchParams.get('platform'))?url.searchParams.get('platform'):undefined))}
     if(p.startsWith('/api/admin/lark/classrooms'))requireAssistant();
     if(p==='/api/admin/lark/classrooms'&&req.method==='GET'){const cfg=larkSettings(store);let classrooms,refreshError=null;if(url.searchParams.get('refresh')==='1'){try{classrooms=await classroom.chats()}catch(e){refreshError=e.code||e.message;classrooms=classroom.list()}}else classrooms=classroom.list();return json(res,200,{classrooms,refreshError,courses:store.all('SELECT id,title FROM courses ORDER BY id').map(c=>({id:c.id,title:JSON.parse(c.title)})),bot:{name:cfg.botName||null,verified:!!cfg.botOpenId},lastError:store.setting('larkClassroomLastError')})}
+    if(p==='/api/admin/lark/classrooms/sources'&&req.method==='GET')return json(res,200,{sources:classroom.sources(String(url.searchParams.get('chatId')||''))});
+    if(p==='/api/admin/lark/classrooms/prepare'&&req.method==='POST'){const r=classroom.startPrepare(String(body.chatId||''));if(r.state==='inactive')fail(409,'请先把该群关联到课程 / Link the group to a course first');audit(s,'lark.classroom_prepare',{chat:body.chatId});return json(res,202,r)}
     if(p==='/api/admin/lark/classrooms/members'&&req.method==='GET')return json(res,200,{members:classroom.roster(String(url.searchParams.get('chatId')||''))});
     if(p==='/api/admin/lark/classrooms'&&req.method==='PUT'){const r=await classroom.bind(body.chatId,{courseId:body.courseId||null,collect:body.collect!==false,autoDraft:body.autoDraft!==false,cards:body.cards!==false,name:typeof body.name==='string'?body.name:''});audit(s,'lark.classroom_bound',{chat:body.chatId,course:body.courseId||null});return json(res,200,r)}
     if(p==='/api/admin/lark/classrooms/digest'&&req.method==='POST'){const day=/^\d{4}-\d{2}-\d{2}$/.test(body.day||'')?body.day:dayKey();const digest=await classroom.distill(body.chatId,day);const draft=body.draft?await classroom.draft(body.chatId,{force:true}):null;audit(s,'lark.classroom_digest',{chat:body.chatId,day});return json(res,200,{digest,draft})}
