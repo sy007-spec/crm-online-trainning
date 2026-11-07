@@ -212,3 +212,5 @@ dialog:has(.reading-share){width:min(560px,calc(100vw - 24px));overflow:auto}
 .lark-room{display:grid;grid-template-columns:minmax(180px,1.3fr) minmax(170px,1fr) minmax(150px,auto) auto;gap:10px 16px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--paper)}
 .lark-room .lark-opts{display:flex;flex-wrap:wrap;gap:4px 14px}.lark-room .actions{margin:0;flex-wrap:wrap}.lark-room select{width:100%}
 @media (max-width:760px){.lark-room{grid-template-columns:1fr}}
+.lark-advanced{margin:10px 0 14px;border:1px dashed var(--line);border-radius:10px;padding:8px 12px}.lark-advanced summary{cursor:pointer;font-weight:600}.lark-advanced[open] summary{margin-bottom:6px}
+.lark-roster{margin-top:4px;max-height:120px;overflow:auto;word-break:break-all}

@@ -51,7 +51,7 @@ test('draft generation is constrained to the key description',async()=>{const f=
 }finally{await f.close()}});
 
 test('without a hosting add-on or injected module the classroom assistant is unavailable',async()=>{const f=await fixture();try{
- const lark=(await f.call('/api/admin/lark')).data;assert.deepEqual(lark.assistant,{available:false,enabled:false});
+ const lark=(await f.call('/api/admin/lark')).data;assert.equal(lark.assistant.available,false);assert.equal(lark.assistant.enabled,false);assert.equal(lark.assistant.longConnection,false);
  assert.equal((await f.call('/api/admin/lark/setup')).status,403);assert.equal((await f.call('/api/admin/lark/classrooms')).status,403);
  assert.equal((await fetch(f.app.server.address&&('http://127.0.0.1:'+f.app.server.address().port+'/lark-setup.js'))).status,404);
 }finally{await f.close()}});

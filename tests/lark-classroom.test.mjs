@@ -15,7 +15,10 @@ const phone='1'+'3912345678';
 function fakeLark(){
  const sent=[];
  const fetch=async(url,init={})=>{const u=new URL(url),body=init.body?JSON.parse(init.body):undefined,p=u.pathname;
-  if(p.endsWith('/tenant_access_token/internal'))return Response.json({code:0,tenant_access_token:'t',expire:7200});
+  // App IDs starting with cli_lark only exist on Lark, so Feishu rejects them (platform detection).
+  if(p.endsWith('/tenant_access_token/internal'))return u.origin==='https://open.feishu.cn'&&String(body?.app_id).startsWith('cli_lark')?Response.json({code:10014,msg:'app not found'}):Response.json({code:0,tenant_access_token:'t',expire:7200});
+  if(p==='/open-apis/im/v1/chats/oc_class01')return Response.json({code:0,data:{name:'外汇入门 1 班',external:false,owner_id_type:'open_id',owner_id:'ou_owner'}});
+  if(p==='/open-apis/im/v1/chats/oc_class01/members'){const union=u.searchParams.get('member_id_type')==='union_id';return Response.json({code:0,data:{items:[['ou_owner','on_owner','王老师'],['ou_m1','on_m1','学员甲'],['ou_m2','on_m2','学员乙']].map(([o,n,name])=>({member_id:union?n:o,name})),has_more:false}})}
   if(p==='/open-apis/bot/v3/info')return Response.json({code:0,bot:{open_id:'ou_bot',app_name:'课堂助手'}});
   if(p==='/open-apis/tenant/v2/tenant/query')return Response.json({code:0,data:{tenant:{tenant_key:'tk',name:'Org'}}});
   if(p==='/open-apis/im/v1/chats')return Response.json({code:0,data:{items:[{chat_id:'oc_class01',name:'外汇入门 1 班',external:false},{chat_id:'oc_extern1',name:'外部群',external:true}],has_more:false}});
@@ -25,10 +28,13 @@ function fakeLark(){
  return {fetch,sent};
 }
 
-async function fixture(){
+// Stand-in for the official SDK's long connection: records options and exposes the registered handlers.
+function fakeSdk(){const state={};return {state,sdk:{Domain:{Feishu:'feishu-domain',Lark:'lark-domain'},LoggerLevel:{fatal:0},EventDispatcher:class{register(h){state.handlers=h;return this}},WSClient:class{constructor(o){state.options=o;state.closed=false}start(){state.started=true}close(){state.closed=true}}}}}
+
+async function fixture({sdk}={}){
  const runtime=fs.mkdtempSync(path.join(os.tmpdir(),'lark-classroom-')),lark=fakeLark();let aiCalls=0;
  let addon=true;const hosting={allowLegacyAdmin:true,status:()=>({active:true,tier:'advanced',limits:{globalModel:true,courses:null},addons:{larkAssistant:addon}}),globalModel:async()=>({baseURL:'https://example.test/v1',model:'test',key:['model','key'].join('-')})};
- const app=createApp({runtime,seedMaterial:testMaterial(),scheduler:false,hosting,larkAssist:lib,briefSchedule:()=>{},embedding:testEmbedding,larkFetch:lark.fetch,aiFetch:async()=>{aiCalls++;return Response.json({choices:[{message:{content:JSON.stringify(Object.fromEntries(splitTrainingLanguages(source()).map(f=>[f.language,f.markdown])))},finish_reason:'stop'}],usage:{total_tokens:10}})}});
+ const app=createApp({runtime,seedMaterial:testMaterial(),scheduler:false,hosting,larkAssist:lib,larkSdk:sdk,briefSchedule:()=>{},embedding:testEmbedding,larkFetch:lark.fetch,aiFetch:async()=>{aiCalls++;return Response.json({choices:[{message:{content:JSON.stringify(Object.fromEntries(splitTrainingLanguages(source()).map(f=>[f.language,f.markdown])))},finish_reason:'stop'}],usage:{total_tokens:10}})}});
  await new Promise(r=>app.server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+app.server.address().port;
  let csrf='';const jar={};
  const call=async(url,method='GET',body)=>{const r=await fetch(base+url,{method,headers:{cookie:Object.entries(jar).map(([k,v])=>k+'='+v).join('; '),'content-type':'application/json','x-csrf-token':csrf},body:body===undefined?undefined:JSON.stringify(body)});for(const c of r.headers.getSetCookie()){const [k,v]=c.split(';')[0].split('=');jar[k]=v}const text=await r.text();let data;try{data=JSON.parse(text)}catch{data=text}if(data?.csrf)csrf=data.csrf;return {status:r.status,data,headers:r.headers}};
@@ -103,4 +109,41 @@ test('without the paid add-on the classroom assistant stays off and free cards k
  assert.equal((await f.call('/api/admin/lark','PUT',{encryptKey,verificationToken})).status,200);
  assert.equal((await f.say('课堂讨论')).status,200);await new Promise(r=>setTimeout(r,50));
  assert.equal(f.store.get("SELECT COUNT(*) n FROM lark_classroom_messages").n,0);
+}finally{await f.close()}});
+
+test('only App ID and App Secret: platform detected, long connection, owner is the admin, members form the roster',{skip},async()=>{const ws=fakeSdk(),f=await fixture({sdk:ws.sdk});try{
+ // Nothing but the two credentials: the Lark platform is detected and the bot verified; daily cards need no recipient list.
+ const saved=await f.call('/api/admin/lark','PUT',{appId:'cli_lark_only',appSecret:['s','e','c'].join(''),enabled:true});
+ assert.equal(saved.status,200,JSON.stringify(saved.data));assert.equal(saved.data.region,'lark');assert.equal(saved.data.botName,'课堂助手');
+ const settings=(await f.call('/api/admin/lark')).data;assert.equal(settings.assistant.longConnection,true);
+ const manifest=(await f.call('/api/admin/lark/setup')).data;assert.equal(manifest.delivery,'long_connection');assert.equal(manifest.eventUrl,null);assert.ok(!manifest.steps.some(x=>x.id==='encryption'));
+ // The long connection opens on the detected platform and also listens for member changes.
+ assert.equal(f.app.classroom.connect().state,'started');assert.equal(ws.state.options.domain,'lark-domain');assert.equal(ws.state.options.appId,'cli_lark_only');
+ assert.ok(ws.state.handlers['im.chat.member.user.added_v1']&&ws.state.handlers['card.action.trigger']);
+ let e=0;const push=(type,body)=>ws.state.handlers[type]({event_id:'ws-'+(++e),...body});
+ await push('im.chat.member.bot.added_v1',{chat_id:'oc_class01',name:'外汇入门 1 班',external:false});
+ assert.equal(f.store.get("SELECT status FROM lark_classrooms WHERE chat_id='oc_class01'").status,'pending');
+ // Linking the group to a course reads the owner and members at once.
+ const bound=(await f.call('/api/admin/lark/classrooms','PUT',{chatId:'oc_class01',courseId:'pamm'})).data;
+ assert.equal(bound.owner_open_id,'ou_owner');assert.equal(bound.owner_name,'王老师');
+ assert.deepEqual((await f.call('/api/admin/lark/classrooms/members?chatId=oc_class01')).data.members.map(m=>m.name),['学员乙','学员甲','王老师'].sort());
+ assert.deepEqual((await f.call('/api/admin/lark')).data.assistant.owners,[{name:'王老师',id:'ou_owner'}]);
+ // Members signed in with Feishu/Lark may read the course (open_id of this app, or union_id from another app of the tenant).
+ assert.equal(f.app.classroom.allows('pamm',{lark_id:'ou_m1'}),true);assert.equal(f.app.classroom.allows('pamm',{lark_union:'on_m2'}),true);
+ assert.equal(f.app.classroom.allows('pamm',{lark_id:'ou_stranger'}),false);assert.equal(f.app.classroom.allows('other',{lark_id:'ou_m1'}),false);
+ // Joins and leaves arrive over the connection and update the roster.
+ await push('im.chat.member.user.added_v1',{chat_id:'oc_class01',users:[{name:'新同学',user_id:{open_id:'ou_new',union_id:'on_new'}}]});
+ assert.equal(f.app.classroom.allows('pamm',{lark_id:'ou_new'}),true);
+ await push('im.chat.member.user.deleted_v1',{chat_id:'oc_class01',users:[{name:'学员甲',user_id:{open_id:'ou_m1',union_id:'on_m1'}}]});
+ assert.equal(f.app.classroom.allows('pamm',{lark_id:'ou_m1'}),false);
+ // The owner receives the daily card and may use its buttons; other people may not.
+ const synced=await f.app.lark.sync(true);assert.deepEqual(synced.recipients.map(r=>r.destination),['open_id:ou_owner']);
+ const card=f.lark.sent.find(x=>x.body?.receive_id==='ou_owner');assert.equal(card.origin,'https://open.larksuite.com');assert.equal(card.body.msg_type,'interactive');
+ const denied=await push('card.action.trigger',{operator:{open_id:'ou_m2'},action:{value:{action:'range',from:'2026-11-01',to:'2026-11-07'}}});assert.equal(denied.toast.type,'error');
+ const allowed=await push('card.action.trigger',{operator:{open_id:'ou_owner'},action:{value:{action:'range',from:'2026-11-01',to:'2026-11-07'}}});assert.equal(allowed.card?.type,'raw',JSON.stringify(allowed));
+ // Unlinking removes both the admin role and the roster access.
+ await f.call('/api/admin/lark/classrooms','PUT',{chatId:'oc_class01',courseId:null});
+ assert.equal(f.app.classroom.allows('pamm',{lark_id:'ou_m2'}),false);assert.deepEqual(f.app.classroom.owners(),[]);
+ // Changed credentials reopen the connection; turning the add-on off is handled by the scheduler.
+ f.app.classroom.disconnect();assert.equal(ws.state.closed,true);
 }finally{await f.close()}});
