@@ -71,7 +71,7 @@ export function larkClassroom(store,{lib,preparation,generateDraft,origin,brief=
  }
  /** Queues the cloud documents and attachments of one message (live or from history). */
  function queueMaterials(chat,m){
-  for(const d of m.docLinks||[])enqueue(chat,'doc:'+d.kind+':'+d.token,{messageId:m.messageId,kind:d.kind,name:d.url,skip:['docx','wiki'].includes(d.kind)?null:'暂只支持飞书新版文档与知识库页面；表格、多维表格、旧版文档请导出为文件发到群里 / Only docx and wiki pages are read'});
+  for(const d of m.docLinks||[])enqueue(chat,'doc:'+d.kind+':'+d.token,{messageId:m.messageId,kind:d.kind,name:d.url,skip:['docx','wiki','sheets'].includes(d.kind)?null:'暂只支持飞书新版文档、电子表格与知识库页面；多维表格、旧版文档请导出为文件发到群里 / Only docx, sheets and wiki pages are read'});
   if(m.file?.key&&m.type==='file')enqueue(chat,'file:'+m.file.key,{messageId:m.messageId,kind:'file',name:m.file.name,skip:READABLE_FILES.has(extOf(m.file.name))?null:'不支持的文件类型（支持 md/txt/pdf/docx/pptx/xlsx/csv/html）/ Unsupported file type'});
  }
  const explain=e=>{const code=Number(e.providerCode);
@@ -90,9 +90,10 @@ export function larkClassroom(store,{lib,preparation,generateDraft,origin,brief=
      const data=await client.downloadResource(src.message_id,src.ref.slice(5),'file',FILE_MAX);
      text=(await extract({name:src.name,data:Buffer.from(data).toString('base64')},{maxBytes:FILE_MAX})).text;
     }else{
-     let token=src.ref.split(':')[2];
-     if(src.kind==='wiki'){const node=await client.wikiNode(token);if(node.objType!=='docx')throw Error('知识库页面不是新版文档，暂不支持 / Wiki page is not a docx document');token=node.objToken;title=node.title}
-     title=(await client.docMeta(token)).title||title;text=await client.docText(token);
+     let token=src.ref.split(':')[2],type=src.kind;
+     if(type==='wiki'){const node=await client.wikiNode(token);if(!['docx','sheet'].includes(node.objType))throw Error('知识库页面不是新版文档或电子表格，暂不支持 / Wiki page is not a docx document or spreadsheet');token=node.objToken;title=node.title;type=node.objType==='sheet'?'sheets':'docx'}
+     if(type==='sheets'){const sheet=await client.sheetText(token);title=sheet.title||title;text=sheet.text}
+     else{title=(await client.docMeta(token)).title||title;text=await client.docText(token)}
     }
     text=String(text||'').trim();if(!text)throw Error('内容为空或无法提取文字 / No readable text');
     const fingerprint=digest(text);if(src.fingerprint===fingerprint&&src.document_id){store.run("UPDATE lark_classroom_sources SET status='saved',error=NULL,updated=? WHERE chat_id=? AND ref=?",store.now(),chat,src.ref);out.unchanged++;continue}

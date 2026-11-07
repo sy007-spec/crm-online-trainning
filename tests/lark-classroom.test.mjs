@@ -30,6 +30,9 @@ function fakeLark(){
   if(p==='/open-apis/wiki/v2/spaces/get_node')return Response.json({code:0,data:{node:{obj_type:'docx',obj_token:'DocRiskWiki1',title:'风险提示'}}});
   if(p==='/open-apis/docx/v1/documents/DocRiskWiki1')return Response.json({code:0,data:{document:{title:'风险提示'}}});
   if(p==='/open-apis/docx/v1/documents/DocRiskWiki1/raw_content')return Response.json({code:0,data:{content:'强平风险：保证金低于维持比例时会被强制平仓。'}});
+  if(p==='/open-apis/sheets/v3/spreadsheets/SheetScore01')return Response.json({code:0,data:{spreadsheet:{title:'练习题'}}});
+  if(p==='/open-apis/sheets/v3/spreadsheets/SheetScore01/sheets/query')return Response.json({code:0,data:{sheets:[{sheet_id:'s1',title:'第一课',resource_type:'sheet'}]}});
+  if(p==='/open-apis/sheets/v2/spreadsheets/SheetScore01/values/s1')return Response.json({code:0,data:{valueRange:{values:[['题目','答案'],['止损单何时触发','价格触及止损价'],[null,'']]}}});
   if(p.startsWith('/open-apis/docx/v1/documents/DocPrivate01'))return Response.json({code:1770032,msg:'forbidden'},{status:403});
   if(p==='/open-apis/im/v1/messages/om_h3/resources/file_v3_handout')return new Response('# 讲义\n\n限价单在指定价格或更优价格成交。',{headers:{'content-type':'application/octet-stream'}});
   if(init.method==='POST'&&p.startsWith('/open-apis/im/v1/messages')){sent.push({path:p,origin:u.origin,body});return Response.json({code:0,data:{message_id:'om_sent'+sent.length}})}
@@ -168,14 +171,14 @@ test('一键备课: group history, shared documents and attachments become cours
  const state=()=>JSON.parse(f.store.get("SELECT prepare_state FROM lark_classrooms WHERE chat_id='oc_class01'").prepare_state||'{}');
  for(let i=0;i<500&&state().state==='running';i++)await new Promise(r=>setTimeout(r,20));
  const p=state();assert.equal(p.state,'done',JSON.stringify(p));
- assert.equal(p.messages,5,'bot messages are left out');assert.equal(p.documents,3);assert.equal(p.documentsFailed,1);assert.equal(p.documentsSkipped,1);assert.equal(p.draft,'drafted');
+ assert.equal(p.messages,5,'bot messages are left out');assert.equal(p.documents,4);assert.equal(p.documentsFailed,1);assert.equal(p.documentsSkipped,0);assert.equal(p.draft,'drafted');
  const docs=f.store.all("SELECT title,raw FROM preparation_documents WHERE course_id='pamm' AND kind='reference'");
  const by=t=>docs.find(d=>d.title===t)?.raw||'';
  assert.match(by('飞书资料 · 课程大纲'),/第三课 杠杆与保证金/);assert.match(by('飞书资料 · 风险提示'),/强制平仓/);assert.match(by('飞书资料 · 讲义.md'),/限价单在指定价格/);
  assert.ok(docs.some(d=>/止损单要设在关键支撑位/.test(d.raw)),'history discussion is digested');
  assert.ok(f.store.get("SELECT draft FROM courses WHERE id='pamm'").draft>before,'a course draft was generated');
  const sources=(await f.call('/api/admin/lark/classrooms/sources?chatId=oc_class01')).data.sources;
- assert.match(sources.find(x=>x.ref==='doc:docx:DocPrivate01').error,/分享/);assert.equal(sources.find(x=>x.ref==='doc:sheets:SheetScore01').status,'skipped');
+ assert.match(sources.find(x=>x.ref==='doc:docx:DocPrivate01').error,/分享/);assert.equal(sources.find(x=>x.ref==='doc:sheets:SheetScore01').status,'saved');assert.match(by('飞书资料 · 练习题'),/\| 止损单何时触发 \| 价格触及止损价 \|/);
  // Running again re-reads documents but does not duplicate sources.
  const count=docs.length;await f.app.classroom.prepare('oc_class01');assert.equal(f.store.get("SELECT COUNT(*) n FROM preparation_documents WHERE course_id='pamm' AND kind='reference'").n,count);
  // A document shared later is queued live and read by the scheduler's ingest step.
