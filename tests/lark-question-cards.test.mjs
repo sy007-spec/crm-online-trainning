@@ -42,3 +42,7 @@ test('unconfigured messages remain queued and later route without losing source 
   f.app.store.run("UPDATE discussion_context SET visibility='private' WHERE root_id=?",id);await f.app.questionCards.tick();assert(!f.calls.at(-1).body.content.includes('Updated while transport disabled'));assert.equal(f.calls.filter(x=>x.method==='POST').length,1);
  }finally{await f.close()}
 });
+test('Markdown form preserves supplementary Unicode across 1000-character boundaries',async()=>{
+ const f=await fixture();try{const id=f.add();await f.app.questionCards.tick();const parts=['a'.repeat(999)+'😀','b'.repeat(999)+'😀','',''];const result=f.app.questionCards.handle({eventId:'unicode',actor:'ou_admin',messageId:f.row(id).message_id,value:f.value(id,'question_publish'),formValue:Object.fromEntries(parts.map((p,i)=>['reply_'+i,p]))});assert.equal(result.toast.type,'success');const fields=f.card(id).body.elements.find(e=>e.tag==='form').elements.filter(e=>e.tag==='input');assert.equal(fields.map(e=>e.default_value).join(''),parts.join(''));assert(fields.every(e=>Array.from(e.default_value).length<=1000));
+ }finally{await f.close()}
+});

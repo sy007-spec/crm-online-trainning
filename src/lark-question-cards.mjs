@@ -26,7 +26,7 @@ export function larkQuestionCards(store,{lark,origin,discussions,owners=()=>[],a
   const details=safe?'课程：'+Object.values(JSON.parse(store.get('SELECT title FROM courses WHERE id=?',q.course_id).title)).join(' / ')+' · '+(store.get('SELECT name FROM users WHERE id=?',q.user_id)?.name||'学员')+' · '+q.created:'';
   const elements=[...(safe?[{tag:'markdown',content:md(details)}]:[]),{tag:'markdown',content:safe?'**课堂留言 / Classroom message**\n'+md(excerpt(q.body||'（图片留言，请打开课堂查看原图）')):'此留言已删除、受限或为私密内容，请在课堂中按原权限查看。'}];
   if(safe){elements.push({tag:'markdown',content:'**'+(r&&!r.removed&&r.source===source(q)?'讲师回复 / Instructor reply':a?.status==='answered'?'AI 草稿，可修改后发布 / Editable AI draft':'人工回复可直接填写 / Manual reply available')+'**\n'+(answer?md(excerpt(answer)):'尚无可用回复；不依赖 AI 即可回复。')});
-   if(answer.length<=4000){const parts=[];let rest=answer;for(let i=0;i<4;i++){let n=Math.min(1000,rest.length);if(n&&/[\uD800-\uDBFF]/.test(rest[n-1]))n--;parts.push(rest.slice(0,n));rest=rest.slice(n);}if(rest)parts[3]+=rest;
+   if(answer.length<=4000){const chars=Array.from(answer),parts=Array.from({length:4},(_,i)=>chars.slice(i*1000,(i+1)*1000).join(''));
     elements.push({tag:'form',name:'reply_form',elements:[{tag:'markdown',content:'**Markdown 编辑** · 四段按顺序拼接；预览不会发布，点击发布才更新课堂。'},...parts.map((text,i)=>({tag:'input',name:'reply_'+i,input_type:'multiline_text',default_value:text,max_length:1000,placeholder:{tag:'plain_text',content:'回复第 '+(i+1)+' 段（最多 1000 字）'},width:'fill'})),button('preview','预览 Markdown','question_preview'),button('publish','发布讲师回复','question_publish')]});
    }else elements.push({tag:'markdown',content:'原 AI 回复超过课堂 4000 字限制，上方仅为节选。完整原文保留在课堂；可点击下方清空编辑后填写精简回复。'});
    elements.push({tag:'button',text:{tag:'plain_text',content:'刷新 / 清空编辑'},behaviors:[{type:'callback',value:{...value,action:'question_reset'}}]});
@@ -55,7 +55,7 @@ export function larkQuestionCards(store,{lark,origin,discussions,owners=()=>[],a
   if(!eventId)fail(400,'Event ID required');
   if(store.get('SELECT id FROM callbacks WHERE id=?',eventId))return {toast:{type:'info',content:'已处理 / Already processed'}};
   const r=response(q);if(value.action!=='question_reset'&&(value.revision!==row.revision||value.source!==source(q)||value.replyRevision!==(r?.revision||0)))fail(409,'留言或回复已更新，请刷新卡片 / Message changed; refresh the card');
-  let draft='';if(value.action!=='question_reset'){for(let i=0;i<4;i++){const part=formValue['reply_'+i];if(typeof part!=='string'||part.length>1000)fail(400,'Invalid Markdown input');draft+=part;}draft=draft.trim();if(!draft||draft.length>4000)fail(400,'回复须为 1–4000 字 / Reply requires 1–4000 characters');}
+  let draft='';if(value.action!=='question_reset'){for(let i=0;i<4;i++){const part=formValue['reply_'+i];if(typeof part!=='string'||Array.from(part).length>1000)fail(400,'Invalid Markdown input');draft+=part;}draft=draft.trim();if(!draft||draft.length>4000)fail(400,'回复须为 1–4000 字 / Reply requires 1–4000 characters');}
   store.transaction(()=>{
    if(value.action==='question_publish'){
     const user='lark-reply:'+digest(actor).slice(0,32);store.run('INSERT OR IGNORE INTO users(id,device_hash,name,created) VALUES(?,?,?,?)',user,user,'飞书讲师 / Lark instructor',store.now());
