@@ -154,6 +154,14 @@ test('only App ID and App Secret: platform detected, long connection, owner is t
  const card=f.lark.sent.find(x=>x.body?.receive_id==='ou_owner');assert.equal(card.origin,'https://open.larksuite.com');assert.equal(card.body.msg_type,'interactive');
  const denied=await push('card.action.trigger',{operator:{open_id:'ou_m2'},action:{value:{action:'range',from:'2026-11-01',to:'2026-11-07'}}});assert.equal(denied.toast.type,'error');
  const allowed=await push('card.action.trigger',{operator:{open_id:'ou_owner'},action:{value:{action:'range',from:'2026-11-01',to:'2026-11-07'}}});assert.equal(allowed.card?.type,'raw',JSON.stringify(allowed));
+ // Markdown form values and message binding survive the SDK long-connection path.
+ const author=f.store.get('SELECT id FROM users LIMIT 1').id,qid='ws-card-question';
+ f.store.run('INSERT INTO questions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',qid,'pamm','manager-01',author,null,qid,'Question from web',0,0,0,f.store.now(),1,'discussion');
+ f.app.questionCards.enqueue(qid);await f.app.questionCards.tick();
+ const row=f.store.get('SELECT * FROM lark_question_cards WHERE question_id=?',qid),rendered=f.app.questionCards.render(row);
+ const action=rendered.body.elements.find(e=>e.tag==='form').elements.find(e=>e.name==='publish').behaviors[0].value;
+ const submitted=await push('card.action.trigger',{operator:{open_id:'ou_owner'},context:{open_message_id:row.message_id},action:{value:action,form_value:{reply_0:'**SDK reply**',reply_1:'',reply_2:'',reply_3:''}}});
+ assert.equal(submitted.toast.type,'success');assert.equal(f.store.get('SELECT q.body FROM lark_question_replies r JOIN questions q ON q.id=r.reply_id WHERE r.question_id=?',qid).body,'**SDK reply**');
  // Unlinking removes both the admin role and the roster access.
  await f.call('/api/admin/lark/classrooms','PUT',{chatId:'oc_class01',courseId:null});
  assert.equal(f.app.classroom.allows('pamm',{lark_id:'ou_m2'}),false);assert.deepEqual(f.app.classroom.owners(),[]);

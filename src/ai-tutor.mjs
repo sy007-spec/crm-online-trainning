@@ -33,7 +33,9 @@ export function aiTutor(store,{hosting,quota,fetcher=fetch,knowledge,modelPool})
  if(!store.all('PRAGMA table_info(ai_answers)').some(c=>c.name==='failure_reason'))store.db.exec("ALTER TABLE ai_answers ADD COLUMN failure_reason TEXT NOT NULL DEFAULT ''");
  const health=customModelHealth(store,{fetcher}),logs=diagnostics(store);
  const fingerprint=q=>digest(q.body);
- function view(q,c){if(q.removed)return null;const a=store.get('SELECT * FROM ai_answers WHERE question_id=?',q.id);if(!a)return null;
+ function view(q,c){if(q.removed)return null;
+  if(store.get("SELECT name FROM sqlite_master WHERE name='lark_question_replies'")){const r=store.get('SELECT r.source,p.removed FROM lark_question_replies r JOIN questions p ON p.id=r.reply_id WHERE r.question_id=?',q.id),root=store.get('SELECT removed FROM questions WHERE id=?',q.root_id||q.id),visibility=store.get('SELECT visibility FROM discussion_context WHERE root_id=?',q.root_id||q.id)?.visibility||'public';if(r&&!r.removed&&r.source===digest(JSON.stringify([q.body,q.removed,root?.removed||0,visibility])))return {status:'reviewed'};}
+ const a=store.get('SELECT * FROM ai_answers WHERE question_id=?',q.id);if(!a)return null;
   if(knowledge&&a.knowledge_signature!==knowledge.signature(c))return {status:'stale'};
   if(a.business!==c.businessId||a.revision!==c.published||a.fingerprint!==fingerprint(q))return {status:'stale'};
   if(a.status==='pending'&&Date.parse(a.updated)<Date.now()-120000)return {status:'failed'};
@@ -41,7 +43,7 @@ export function aiTutor(store,{hosting,quota,fetcher=fetch,knowledge,modelPool})
  }
  async function answer(q,c,material,{language='zh',history=[],valid=()=>true,retry=false}={}){
   const knowledgeSignature=knowledge?.signature(c)||'';
-  const prior=view(q,c);if(prior?.status==='pending'||(!retry&&['answered','insufficient'].includes(prior?.status)))return prior;
+  const prior=view(q,c);if(prior?.status==='reviewed')return prior;if(prior?.status==='pending'||(!retry&&['answered','insufficient'].includes(prior?.status)))return prior;
   if(store.get("SELECT COUNT(*) n FROM ai_answers WHERE status='pending' AND updated>?",new Date(Date.now()-120000).toISOString()).n>=2)return {status:'busy'};
   try{store.run("INSERT INTO ai_answers(question_id,status,business,revision,fingerprint,updated) VALUES(?,'pending',?,?,?,?) ON CONFLICT(question_id) DO UPDATE SET status='pending',body='',sources='[]',translations='{}',business=excluded.business,revision=excluded.revision,fingerprint=excluded.fingerprint,updated=excluded.updated",q.id,c.businessId,c.published,fingerprint(q),store.now())}catch{return {status:'failed'}}
   store.run('UPDATE ai_answers SET knowledge_signature=? WHERE question_id=?',knowledgeSignature,q.id);
