@@ -1,0 +1,11 @@
+export function knowledgeObservability(store){
+ store.db.exec(`CREATE TABLE IF NOT EXISTS knowledge_model_calls(id INTEGER PRIMARY KEY AUTOINCREMENT,library TEXT NOT NULL,stage TEXT NOT NULL,started TEXT NOT NULL,duration INTEGER NOT NULL,state TEXT NOT NULL,input_tokens INTEGER,output_tokens INTEGER,total_tokens INTEGER);
+ CREATE INDEX IF NOT EXISTS knowledge_model_scope ON knowledge_model_calls(library,started);
+ CREATE TABLE IF NOT EXISTS knowledge_history(library TEXT NOT NULL,day TEXT NOT NULL,updated TEXT NOT NULL,snapshot TEXT NOT NULL,PRIMARY KEY(library,day));`);
+ const valid=n=>Number.isSafeInteger(n)&&n>=0?n:null;
+ function record({library,stage,started,duration,state,usage}){store.run('INSERT INTO knowledge_model_calls(library,stage,started,duration,state,input_tokens,output_tokens,total_tokens) VALUES(?,?,?,?,?,?,?,?)',String(library||''),stage,new Date(started).toISOString(),Math.max(0,duration),state,valid(usage?.prompt_tokens),valid(usage?.completion_tokens),valid(usage?.total_tokens));}
+ function snapshot(library,data){const stamp=store.now(),day=new Date(Date.parse(stamp)+8*3600000).toISOString().slice(0,10);store.run('INSERT INTO knowledge_history VALUES(?,?,?,?) ON CONFLICT(library,day) DO UPDATE SET updated=excluded.updated,snapshot=excluded.snapshot',library,day,stamp,JSON.stringify(data));store.run('DELETE FROM knowledge_history WHERE library=? AND day<?',library,new Date(Date.parse(stamp)-366*86400000).toISOString().slice(0,10));store.run('DELETE FROM knowledge_model_calls WHERE library=? AND started<?',library,new Date(Date.parse(stamp)-90*86400000).toISOString());}
+ function describe(library){const since=new Date(Date.parse(store.now())-30*86400000).toISOString(),calls=store.all('SELECT stage,substr(started,1,10) day,COUNT(*) calls,SUM(CASE WHEN state=\'failed\' THEN 1 ELSE 0 END) failures,AVG(duration) latency,SUM(total_tokens) tokens,SUM(CASE WHEN total_tokens IS NULL THEN 1 ELSE 0 END) unknown FROM knowledge_model_calls WHERE library=? AND started>=? GROUP BY day,stage ORDER BY day',library,since);return {windowDays:30,calls,timeZone:'UTC',cost:null,history:store.all('SELECT day,updated,snapshot FROM knowledge_history WHERE library=? ORDER BY day DESC LIMIT 30',library).reverse().map(r=>({...r,snapshot:JSON.parse(r.snapshot)}))};}
+ return {record,snapshot,describe};
+}
+

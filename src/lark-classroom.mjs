@@ -17,7 +17,7 @@ const DAY_MS=86400000,QUIET_MS=10*60000,DRAFT_INTERVAL_MS=6*3600000,TEXT_MAX=800
 const shanghaiDay=ms=>new Date(ms+8*3600000).toISOString().slice(0,10);
 const dayStart=day=>Date.parse(day+'T00:00:00+08:00');
 
-export function larkClassroom(store,{lib,preparation,generateDraft,origin,brief=()=>'',fetch,now=Date.now,sdk=null,manualAdmins=()=>[],onCardAction,extract=null,autoPrepare=false,historyDays=180}){
+export function larkClassroom(store,{lib,preparation,generateDraft,origin,brief=()=>'',fetch,now=Date.now,sdk=null,manualAdmins=()=>[],onCardAction,extract=null,vision=null,autoPrepare=false,historyDays=180}){
  const {createAssistant,cleanDiscussion,discussionMarkdown,cards}=lib;
  let clientValue=null,clientKey='';
  const larkClient=()=>{const c=larkSettings(store);if(!c.appId||!c.appSecret)throw Error('Lark app credentials missing');const key=[larkDomain(c),c.appId,c.appSecret].join('\u0000');if(!clientValue||clientKey!==key){clientValue=lib.createLarkClient({domain:larkDomain(c),appId:c.appId,appSecret:c.appSecret,fetch});clientKey=key}return clientValue};
@@ -71,6 +71,7 @@ export function larkClassroom(store,{lib,preparation,generateDraft,origin,brief=
  }
  /** Queues the cloud documents and attachments of one message (live or from history). */
  function queueMaterials(chat,m){
+  for(const key of m.imageKeys||[])enqueue(chat,'image:'+key,{messageId:m.messageId,kind:'image',name:'群图片.jpg'});
   for(const d of m.docLinks||[])enqueue(chat,'doc:'+d.kind+':'+d.token,{messageId:m.messageId,kind:d.kind,name:d.url,skip:['docx','wiki','sheets'].includes(d.kind)?null:'暂只支持飞书新版文档、电子表格与知识库页面；多维表格、旧版文档请导出为文件发到群里 / Only docx, sheets and wiki pages are read'});
   if(m.file?.key&&m.type==='file')enqueue(chat,'file:'+m.file.key,{messageId:m.messageId,kind:'file',name:m.file.name,skip:READABLE_FILES.has(extOf(m.file.name))?null:'不支持的文件类型（支持 md/txt/pdf/docx/pptx/xlsx/csv/html）/ Unsupported file type'});
  }
@@ -85,10 +86,10 @@ export function larkClassroom(store,{lib,preparation,generateDraft,origin,brief=
   for(const src of store.all("SELECT * FROM lark_classroom_sources WHERE chat_id=? AND status IN ('pending','failed') AND attempts<3 ORDER BY created LIMIT ?",chat,limit)){
    try{
     let title=src.name,text;
-    if(src.kind==='file'){
+    if(src.kind==='file'||src.kind==='image'){
      if(!extract)throw Error('文件解析不可用 / File extraction unavailable');
-     const data=await client.downloadResource(src.message_id,src.ref.slice(5),'file',FILE_MAX);
-     text=(await extract({name:src.name,data:Buffer.from(data).toString('base64')},{maxBytes:FILE_MAX})).text;
+     const data=await client.downloadResource(src.message_id,src.ref.slice(src.kind==='image'?6:5),src.kind==='image'?'image':'file',FILE_MAX);
+     const extracted=await extract({name:src.name,data:Buffer.from(data).toString('base64')},{maxBytes:FILE_MAX});text=extracted.text;if(extracted.images?.length){if(!vision)throw Error('视觉模型未配置 / Vision model unavailable');text=await vision({course:r.course_id,chat,text,images:extracted.images});if(!text)throw Error('视觉解析失败 / Vision extraction failed');}
     }else{
      let token=src.ref.split(':')[2],type=src.kind;
      if(type==='wiki'){const node=await client.wikiNode(token);if(!['docx','sheet'].includes(node.objType))throw Error('知识库页面不是新版文档或电子表格，暂不支持 / Wiki page is not a docx document or spreadsheet');token=node.objToken;title=node.title;type=node.objType==='sheet'?'sheets':'docx'}

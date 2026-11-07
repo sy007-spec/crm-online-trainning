@@ -6,9 +6,30 @@ const libPath=process.env.LARK_FEISHU_ASSIST;
 const lib=libPath&&fs.existsSync(libPath)?await import(pathToFileURL(path.resolve(libPath)).href):null;
 const skip=lib?false:'set LARK_FEISHU_ASSIST to the private lark-feishu-assist module';
 
+test('knowledge HTTP flow verifies course scope, usage and source withdrawal',{skip},async()=>{const runtime=fs.mkdtempSync(path.join(os.tmpdir(),'knowledge-http-')),f=await open(runtime);try{
+ const base='/api/assist-knowledge',q='?course=pamm';assert.equal((await f.call(base+'?course=unknown')).status,403);
+ const doc=(await f.call('/api/materials?course=pamm','POST',{title:'认证资料',markdown:'采用 OAuth',kind:'reference'})).data;
+ assert.equal((await f.call(base+'/settings'+q,'POST',{enabled:true,background:'认证设计'})).status,200);
+ assert.equal((await f.call(base+'/process'+q,'POST',{})).status,200);
+ const cards=(await f.call(base+q)).data.cards;assert.equal(cards.length,1);assert.equal((await f.call(base+'/search'+q+'&q=OAuth')).data.items.length,0);
+ await f.call(base+'/publish'+q,'POST',{id:cards[0].id});assert.equal((await f.call(base+'/search'+q+'&q=OAuth')).data.items.length,1);
+ const exported=(await f.call(base+'/export'+q,'POST',{id:cards[0].id})).data;assert.equal(exported.state,'draft');const repeated=(await f.call(base+'/export'+q,'POST',{id:cards[0].id})).data;assert.equal(repeated.id,exported.id);assert.equal(repeated.unchanged,true);
+ const obs=(await f.call(base+'/telemetry'+q)).data;assert.equal(obs.calls.find(c=>c.stage==='distillation').tokens,10);assert.equal(obs.history.length,1);
+ await f.call('/api/materials/'+doc.id+'/archive?course=pamm','POST',{});assert.equal((await f.call(base+'/search'+q+'&q=OAuth')).data.items.length,0);
+ }finally{await f.close();fs.rmSync(runtime,{recursive:true,force:true})}});
+
+test('image original runs vision and records actual provider usage before review',{skip},async()=>{
+ const runtime=fs.mkdtempSync(path.join(os.tmpdir(),'materials-vision-'));const f=await open(runtime);try{
+  const {default:sharp}=await import('sharp'),bytes=await sharp({create:{width:2,height:2,channels:3,background:'#ffffff'}}).png().toBuffer();
+  const r=await f.call('/api/materials/upload?course=pamm','POST',{files:[{name:'diagram.png',data:bytes.toString('base64')}],kind:'reference'});assert.equal(r.status,200);const created=r.data.created[0];assert.equal(created.kind,'conversion');
+  let job;for(let i=0;i<100;i++){await f.app.materials.engine.processJobs();job=(await f.call('/api/materials/'+created.id+'/jobs/'+created.job+'?course=pamm')).data;if(!['pending','processing'].includes(job.state))break;await new Promise(r=>setTimeout(r,20));}
+  assert.equal(job.state,'awaiting_review');assert.ok(job.warnings.includes('vision_review_required'));const usage=f.app.store.get("SELECT * FROM knowledge_model_calls WHERE stage='vision'");assert.equal(usage.total_tokens,10);assert.equal(usage.library,'pamm');
+ }finally{await f.close();fs.rmSync(runtime,{recursive:true,force:true})}
+});
+
 async function open(runtime,{withLib=true,calls=[]}={}){
  const hosting={allowLegacyAdmin:true,status:()=>({active:true,tier:'advanced',limits:{globalModel:true,courses:null},addons:{larkAssistant:false}}),globalModel:async()=>({baseURL:'https://example.test/v1',model:'test',key:['model','key'].join('-')})};
- const aiFetch=async(url,init)=>{const body=JSON.parse(init.body);calls.push(body.messages[0].content.slice(0,10));return Response.json({choices:[{message:{content:'# 讲义（校准）\n\n限价单在指定价格成交。'},finish_reason:'stop'}],usage:{total_tokens:10}})};
+ const aiFetch=async(url,init)=>{const body=JSON.parse(init.body);calls.push(body.messages[0].content.slice(0,10));return Response.json({choices:[{message:{content:body.messages[0].content.startsWith('你是资料整理员')?JSON.stringify([{title:'认证决定',kind:'decision',markdown:'采用 OAuth',citations:[JSON.parse(body.messages[1].content).messages[0].id]}]):'# 讲义（校准）\n\n限价单在指定价格成交。'},finish_reason:'stop'}],usage:{total_tokens:10}})};
  const app=createApp({runtime,seedMaterial:testMaterial(),scheduler:false,hosting,embedding:testEmbedding,aiFetch,briefSchedule:()=>{},...(withLib?{larkAssist:lib}:{})});
  await new Promise(r=>app.server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+app.server.address().port;
  let csrf='';const jar={};
